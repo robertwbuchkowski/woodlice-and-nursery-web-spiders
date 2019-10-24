@@ -1,0 +1,17 @@
+Cage,Block,Treatment,Temp
+1,1,SIG,W
+2,1,SG,W
+3,1,SIG,C
+4,1,SG,C
+5,2,SIG,W
+6,2,SG,W
+7,2,SIG,C
+8,2,SG,C
+9,3,SIG,W
+10,3,SG,W
+11,3,SIG,C
+12,3,SG,C
+13,4,SIG,W
+14,4,SG,W
+15,4,SIG,C
+16,4,SG,C
