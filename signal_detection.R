@@ -96,9 +96,11 @@ scanp <- function(inPloss){
   A = outcome(floor(op$maximum), pars=PARS)
   B = outcome(ceiling(op$maximum), pars=PARS)
   
-  ppp = ifelse(A>B, 
-               c(objective = A, maximum = floor(op$maximum)), 
-               c(objective = B, maximum = ceiling(op$maximum)))
+  if(A>B){
+    ppp = c(objective = A, maximum = floor(op$maximum))
+  }else{
+    ppp = c(objective = B, maximum = ceiling(op$maximum))
+  }
   
   return(ppp)
   
@@ -109,6 +111,8 @@ scanp(0.25)
 
 o1 = sapply(seq(0.01, 0.5, 0.01), FUN = scanp)
 
-plot(t(o1))
+o2 = cbind(t(o1), Ploss = seq(0.01, 0.5, 0.01))
 
+plot(maximum~Ploss, o2, type = "l")
+plot(objective~Ploss, o2, type = "l")
 
