@@ -1,6 +1,7 @@
-# Extract isopod data and build distribution
 require(brms)
 require(tidyverse)
+
+# Extract isopod data and build distribution ----
 
 ISOPOD <-
     # behaviour data from 2017
@@ -41,7 +42,7 @@ length(IP)/(length(IT)*6) # probability of being aboveground...convervative
 # where a conservative estimate of 40 -90 (mean = 80) % of the population is sheltering at a given
 # time. O. asellus is less heat tolerant, so maybe that is OK.
 
-# Load in Jennie's Excell data
+# Load in Jennie's Excell data ----
 
 library(readxl)
 
@@ -127,7 +128,6 @@ outputf <- output %>%
 
 rm(output2011)
 
-
 outputf %>% filter(Pred == "rim"| Pred == "rima" & Species == "Pred" & Var == "y") %>%
   ggplot(aes(x=V2)) + geom_histogram() + theme_classic()
 
@@ -146,8 +146,10 @@ outputf %>% filter(Pred == "mira" & Species == "Pred" & Var == "y") %>%
   filter(!is.na(V2)) %>%
   ggplot(aes(x=V2)) + geom_histogram() + theme_classic()
 
-
+# Determine the mean and sd heights from combined data ----
 # Now I need to fit a random effects model with STAN to get the distributions
+
+# ....CLARUS ----
 
 CLARUS = outputf %>% filter(Pred == "rim"|Pred == "rima" & Species == "Pred" & Var == "y") %>%
   select(Rep, Year, V2) %>%
@@ -168,7 +170,7 @@ plot(fitCLARUS)
 summary(fitCLARUS)
 pairs(fitCLARUS)
 
-# Now test the isopod distribution
+# ....ISOPOD ----
 
 ISOPOD2 = ISOPOD %>%
   filter(z < 1e6) %>%
@@ -205,6 +207,7 @@ make_stancode(
   family= "gamma"
 )
 
+# .... MIRA ----
 # Now get the P. mira distribution (adding Jennie and our data together)
 
 MIRA = outputf %>% filter(Pred == "mira" & Species == "Pred" & Var == "y") %>%
@@ -236,6 +239,77 @@ lme4::lmer(V2~(1|Rep), data = MIRA)
 
 lme4::glmer(V2~(1|Rep), data=ISOPOD2, family = "Gamma")
 
+# .....FEMUR ----
+# Now get the grasshopper distribution (adding Jennie and our data together)
+
+FEMUR = outputf %>% filter(Pred == "mira" & Species == "GH" & Var == "y") %>%
+  select(Rep, V2) %>%
+  filter(!is.na(V2)) %>%
+  bind_rows(
+    behaviour %>% filter(Species == "MEFE" & Temp == "C") %>%
+      mutate(Rep = paste0("CS",Block, Year)) %>%
+      rename(V2 = z) %>%
+      select(Rep, V2) %>%
+      filter(!is.na(V2))
+  )
+
+mean(FEMUR$V2)
+sd(FEMUR$V2)
+
+
+fitFEMUR <- brm(
+  V2 ~ (1|Rep), chains = 2, cores = 2,
+  data=FEMUR,
+  control = list(adapt_delta=0.99)
+)
+
+plot(fitFEMUR)
+summary(fitFEMUR)
+pairs(fitMIRA)
+
+summary(lme4::lmer(V2~(1|Rep), data = FEMUR))
+
+# Put it all together ----
+xs <- seq(0, 100, by = 0.1)
+fmira <- dnorm(xs, mean = 41.41, sd = 17.99)
+fclarus <- dnorm(xs, mean = 28.95, sd = 19.11)
+fisopod <- dgamma(xs, shape = 1.7, scale = 1.59)
+ffemur <- dnorm(xs, mean = 54.48, sd = 19.39)
+
+plot(xs~fmira, type = "l", xlim = c(0, max(fmira, fclarus, fisopod)),
+     ylab = "Height", xlab = "Frequency")
+points(xs~fclarus, type = "l", col ="blue")
+points(xs~fisopod, type = "l", col ="orange")
+points(xs~ffemur, type = "l", col ="green")
+
+# Calculate the probability of encounter based on distributions ----
+
+D1 = data.frame(Species = c("Clarus", "Femur", "Isopod"),
+           Htmean = c(28.95, 54.48, NA),
+           Htsd = c(19.11, 19.39, NA),
+           Htmira = c(41.41, 41.41, 41.41),
+           Sdmira = c(17.99, 17.99, 17.99),
+           shape = c(NA, NA, 1.7),
+           scale = c(NA, NA, 1.59))
+
+D1[,"Overlap2"] = D1[,"Overlap"] = exp((-1*(D1$Htmira - D1$Htmean)^2)/(2*(D1$Sdmira^2 + D1$Htsd^2)))/
+  sqrt(2*3.14*(D1$Sdmira^2 + D1$Htsd^2))
+
+for(i in 1:2){
+  D1[i,"Overlap2"] = sum(dnorm(seq(0,100,0.1), mean = D1$Htmira[i], sd = D1$Sdmira[i])*
+                          dnorm(seq(0,100,0.1), mean = D1$Htmean[i], sd = D1$Htsd[i]))
+  
+}
+
+D1[3,"Overlap2"] = sum(dnorm(seq(0,100,0.1), mean = D1$Htmira[3], sd = D1$Sdmira[3])*
+                         dgamma(seq(0,100,0.1), shape = D1$shape[3], scale = D1$scale[3]))
+
+D1
+
+# Overlap2 is the probability of encounter of each organism.
+
+
+# .....WRONG VERSION ----
 min.f1f2 <- function(x, mu1, mu2, sd1, sd2){
   f1 <- dnorm(x, mean = mu1, sd = sd1)
   f2 <- dnorm(x, mean = mu2, sd = sd2)
@@ -258,13 +332,3 @@ min.f1f3 <- function(x, mu1, shape3, sd1, scale3){
 }
 
 integrate(min.f1f3, 0, Inf, mu1 = 41.41, shape3 = 1.7, sd1 = 17.99, scale3 = 1.59)
-
-xs <- seq(0, 100, by = 0.1)
-fmira <- dnorm(xs, mean = 41.41, sd = 17.99)
-fclarus <- dnorm(xs, mean = 28.95, sd = 19.11)
-fisopod <- dgamma(xs, shape = 1.7, scale = 1.59)
-
-plot(xs~fmira, type = "l", xlim = c(0, max(fmira, fclarus, fisopod)),
-     ylab = "Height", xlab = "Frequency")
-points(xs~fclarus, type = "l", col ="blue")
-points(xs~fisopod, type = "l", col ="orange")
