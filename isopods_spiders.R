@@ -308,6 +308,205 @@ D1
 
 # Overlap2 is the probability of encounter of each organism.
 
+# Now write the correct version for the function
+
+calc.overlap <- function(htmira){
+  D1 = data.frame(Species = c("Clarus", "Femur", "Isopod"),
+                  Htmean = c(28.95, 54.48, NA),
+                  Htsd = c(19.11, 19.39, NA),
+                  Htmira = c(htmira, htmira, htmira),
+                  Sdmira = c(17.99, 17.99, 17.99),
+                  shape = c(NA, NA, 1.7),
+                  scale = c(NA, NA, 1.59),
+                  Overlap = c(NA,NA,NA))
+  
+  for(i in 1:2){
+    D1[i,"Overlap"] = sum(dnorm(seq(0,100,0.1), mean = D1$Htmira[i], sd = D1$Sdmira[i])*
+                            dnorm(seq(0,100,0.1), mean = D1$Htmean[i], sd = D1$Htsd[i]))
+    
+  }
+  
+  D1[3,"Overlap"] = sum(dnorm(seq(0,100,0.1), mean = D1$Htmira[3], sd = D1$Sdmira[3])*
+                          dgamma(seq(0,100,0.1), shape = D1$shape[3], scale = D1$scale[3]))
+  
+  
+  return(D1$Overlap)
+}
+
+calc.overlap(41.41)
+
+
+# Energy costs
+
+# M. Ford 1977 and A. Schmitz 2004 have the metabolic data for other spiders that can be used
+# R. Wiegart has the energy content of grasshoppers 5388 cal/g DW
+# M Ford 1977 for P. amentata std = 100 x 10^-3 J h-1 and act 450 x 10^-3 J h-1
+
+
+# Convert Grasshopper body cal to J --> 22543 J/g DW
+# Convert to per grasshopper (using weights from Wiegert) --> 
+# 22543 J/g x 0.0015 g/# = 33.81 J/#
+
+# Convert grasshopper energy to net gain using active handling time
+# Handling time estimated at 20 minutes from Samu (1993). 
+
+# 0.45 - 0.1 J h^-1 = 0.35 J h^-1 extra effort
+# 0.35 J h^-1 x 1 h / 60 min = 0.00583333 J min^-1 
+
+# Gain from grasshopper = 33.81 J - (0.0058333 J min^-1 x 20 minutes) = 33.69
+
+# But, not all attacks are successfull, so we need to modify the expected gain:
+# start with 25% chance of success.
+
+# Cost of attacking an object:
+# 30 seconds to attack and return to resting posture if attack unsuccessful
+# cost - 0.00583333 J min^-1 x 0.5 min = 0.002916667 J
+
+# Being higher in the canopy means being hotter and spiders experience increased
+# basal respiration rate. Following Bazzaz and Mezga (1973) we estimate that going
+# from the ground to 40cm in the canopy increases the temperature by ~5degC.
+# For convenience we approximate the increase as 1C per 10cm up to 1-m during the 
+# 8 hours of direct sunlight in the middle of the day. 
+# We did not observe spiders moving during the hotter parts of the day to lower
+# perches, so we don't model an adaptive behavior of shifting height throughout
+# the day.
+
+# spider resting metabolism goes up higher in the canopy, so can discount this as well
+
+# .... Add in the signal detection theory functions ----
+
+
+outcome <- function(VAR, Woodlice = T){
+  
+  with(as.list(c(VAR)),{
+    
+    upd = 2.5
+    upu = 0
+    sig.t = 1
+    sig.e = 5
+    Vcr = 0
+    Vir = 0
+    tca1 = 20 # handling time of successful attack
+    tia1 = 0.5 # time of incorrect attack or unsuccessfull attack
+    tcr1 = 0
+    tir1 = 0
+    Ploss = 0.25
+    
+    TEMP = 25 + htmira*0.1
+    
+    stdM = stdE(TEMP)
+    actM = actE(TEMP)
+    success.rate = 0.25
+  
+    # Grasshopper energy content times ingestion efficiency and assimilation efficiency
+    Vca = (33.81*0.85*0.95 - (actM - stdM)*tca1)*success.rate - # attacked correctly and got it
+      (actM - stdM)*tia1*(1-success.rate) # attacked correctly and missed
+    Via = (actM - stdM)*tia1 # attacked incorrectly
+    
+    N = 1 + exp(Nin)
+    
+    OVERLAP = calc.overlap(exp(htmira))
+    
+    Pd = OVERLAP[1]/(OVERLAP[3] + OVERLAP[1])
+    
+    sig.p = sqrt(sig.t^2 + (sig.e/sqrt(N))^2)
+    
+    lambda.star = (sig.p^2)*(log((Vcr - Via)/(Vca-Vir))-
+                               log((1 - Pd)/(Pd)))/upd + upd/2
+    
+    Pia = sum(dnorm(lambda.star:100, mean = upu, sd = sig.p))
+    Pcr = 1- Pia
+    Pca = sum(dnorm(lambda.star:100, mean = upd, sd = sig.p))
+    Pir = 1-Pca
+    
+    # eatting is so useful the spiders hit everything
+    G.N = (1-Pd)*(Pia*Via + Pcr*Vcr) + Pd*(Pca*Vca + Pir*Vir) # in units of Joules
+    
+    browser()
+    
+    W.N = G.N*(1-Ploss)^N # Still in units of Joules
+    
+    negcost = -(W.N + (stdM - stdE(25))*8*60)
+    
+    
+    # We use the function of LOCO, because we don't think the other two are easily 
+    # or reasonability applied here 
+    # ---loss of future opportunity requires parameterizing it.
+    # ---spiders are not likely to face multiple prey at once and 
+    # ----predator risk is less important in our empirical case
+    
+    return(negcost) # return the negative
+  })
+}
+
+
+outcome(c(Nin = log(5),htmira = log(41.41)))
+
+op = optim(par = c(c(Nin = log(50),htmira = log(41.41))), fn = outcome)
+
+exp(op$par)
+
+op2 = optim(par = c(c(Nin = log(50),htmira = log(41.41))), fn = outcome, Woodlice = F)
+
+
+mat1 = log(expand.grid(Nin = seq(1,40,5), htmira = seq(1, 100, 10)))
+opt = rep(NA,dim(mat1)[1])
+for(i in 1:dim(mat1)[1]){
+  opt[i] = outcome(mat1[i,])
+}
+opt = -1*opt
+
+opt = cbind(exp(mat1), opt)
+
+plot(opt~htmira, data=opt)
+
+
+
+
+
+
+
+scanp <- function(inPloss){
+  PARS <- c(upd = 2.5,
+            upu = 0,
+            sig.t = 1, 
+            sig.e = 5,
+            Vca = 7.5,
+            Via = -10,
+            Vcr = 0,
+            Vir = 0,
+            Du1 = 5,
+            tca1 = 10,
+            tia1 = 1,
+            tcr1 = 0,
+            tir1 = 0,
+            Dd1 = 5,
+            Ploss = inPloss)
+  
+  op = optimize(f = outcome,lower = 1, upper = 1000, maximum = T,pars= PARS)
+  
+  A = outcome(floor(op$maximum), pars=PARS)
+  B = outcome(ceiling(op$maximum), pars=PARS)
+  
+  if(A>B){
+    ppp = c(objective = A, maximum = floor(op$maximum))
+  }else{
+    ppp = c(objective = B, maximum = ceiling(op$maximum))
+  }
+  
+  return(ppp)
+  
+  
+}
+
+scanp(0.25)
+
+o1 = sapply(seq(0.01, 0.5, 0.01), FUN = scanp)
+
+o2 = cbind(t(o1), Ploss = seq(0.01, 0.5, 0.01))
+
+plot(maximum~Ploss, o2, type = "l")
+plot(objective~Ploss, o2, type = "l")
 
 # .....WRONG VERSION ----
 min.f1f2 <- function(x, mu1, mu2, sd1, sd2){
