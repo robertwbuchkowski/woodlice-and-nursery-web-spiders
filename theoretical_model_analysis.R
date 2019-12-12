@@ -1,3 +1,9 @@
+# Code to run all three model simulations
+
+# 1. Signal-detection theory
+# 2. Always attack net energy gain
+# 3. Individual-based model
+
 require(brms)
 require(tidyverse)
 
@@ -54,7 +60,7 @@ for(i in 1:50){
   sheets[[i]] = read_xlsx("Data/doi_10/Behavioral observations 2011.xlsx",sheet = (i+1), skip = 3)
 }
 
-View(sheets)
+# View(sheets)
 
 output <- do.call("rbind", sheets)
 
@@ -336,7 +342,7 @@ calc.overlap <- function(htmira){
 calc.overlap(41.41)
 
 
-# Energy costs
+# Energy costs (Notes on data sources) ----
 
 # M. Ford 1977 and A. Schmitz 2004 have the metabolic data for other spiders that can be used
 # R. Wiegart has the energy content of grasshoppers 5388 cal/g DW
@@ -373,14 +379,14 @@ calc.overlap(41.41)
 
 # spider resting metabolism goes up higher in the canopy, so can discount this as well
 
-# .... Add in the signal detection theory functions ----
+# 1. Signal detection theory functions ----
 
+source("rosenblatt2019_spiderresp.R")
 
-outcome <- function(VAR, Woodlice = T){
+outcome <- function(VAR,Ploss = 0.25, upd = 2.5,success.rate = 0.25, Woodlice = T, rtPca = F){
   
   with(as.list(c(VAR)),{
-    
-    upd = 2.5
+
     upu = 0
     sig.t = 1
     sig.e = 5
@@ -390,29 +396,36 @@ outcome <- function(VAR, Woodlice = T){
     tia1 = 0.5 # time of incorrect attack or unsuccessfull attack
     tcr1 = 0
     tir1 = 0
-    Ploss = 0.25
     
-    TEMP = 25 + htmira*0.1
+    TEMP = 25 + exp(htmira)*0.1
+    
+    TEMP = ifelse(TEMP > 35, 35, TEMP)
     
     stdM = stdE(TEMP)
     actM = actE(TEMP)
-    success.rate = 0.25
+    
   
     # Grasshopper energy content times ingestion efficiency and assimilation efficiency
     Vca = (33.81*0.85*0.95 - (actM - stdM)*tca1)*success.rate - # attacked correctly and got it
       (actM - stdM)*tia1*(1-success.rate) # attacked correctly and missed
-    Via = (actM - stdM)*tia1 # attacked incorrectly
+    Via = -(actM - stdM)*tia1 # attacked incorrectly
     
     N = 1 + exp(Nin)
     
     OVERLAP = calc.overlap(exp(htmira))
     
-    Pd = OVERLAP[1]/(OVERLAP[3] + OVERLAP[1])
+    Pd = ifelse(OVERLAP[2] > 1e-5, OVERLAP[2]/(OVERLAP[3] + OVERLAP[2]), 1e-5)
     
     sig.p = sqrt(sig.t^2 + (sig.e/sqrt(N))^2)
     
     lambda.star = (sig.p^2)*(log((Vcr - Via)/(Vca-Vir))-
                                log((1 - Pd)/(Pd)))/upd + upd/2
+    
+    if(lambda.star %in% c(Inf, -Inf)){
+      browser()
+    }
+    
+    # browser()
     
     Pia = sum(dnorm(lambda.star:100, mean = upu, sd = sig.p))
     Pcr = 1- Pia
@@ -421,8 +434,6 @@ outcome <- function(VAR, Woodlice = T){
     
     # eatting is so useful the spiders hit everything
     G.N = (1-Pd)*(Pia*Via + Pcr*Vcr) + Pd*(Pca*Vca + Pir*Vir) # in units of Joules
-    
-    browser()
     
     W.N = G.N*(1-Ploss)^N # Still in units of Joules
     
@@ -435,19 +446,26 @@ outcome <- function(VAR, Woodlice = T){
     # ---spiders are not likely to face multiple prey at once and 
     # ----predator risk is less important in our empirical case
     
-    return(negcost) # return the negative
+    if(rtPca){
+      return(Pca)
+    }else{
+      return(negcost)# return the negative
+      }
   })
 }
 
 
 outcome(c(Nin = log(5),htmira = log(41.41)))
 
-op = optim(par = c(c(Nin = log(50),htmira = log(41.41))), fn = outcome)
+op = optim(par = c(c(Nin = log(5),htmira = log(41.41))), fn = outcome)
 
 exp(op$par)
 
-op2 = optim(par = c(c(Nin = log(50),htmira = log(41.41))), fn = outcome, Woodlice = F)
+op2 = optim(par = c(c(Nin = log(10),htmira = log(41.41))), fn = outcome, Woodlice = F)
 
+exp(op2$par)
+
+# Explore outcomes over htmira and Nin values
 
 mat1 = log(expand.grid(Nin = seq(1,40,5), htmira = seq(1, 100, 10)))
 opt = rep(NA,dim(mat1)[1])
@@ -458,76 +476,284 @@ opt = -1*opt
 
 opt = cbind(exp(mat1), opt)
 
-plot(opt~htmira, data=opt)
+plot(opt~htmira, data=opt, col = Nin)
+plot(opt~Nin, data=opt, col = htmira)
 
+# Scan optimum across 
 
-
-
-
-
-
-scanp <- function(inPloss){
-  PARS <- c(upd = 2.5,
-            upu = 0,
-            sig.t = 1, 
-            sig.e = 5,
-            Vca = 7.5,
-            Via = -10,
-            Vcr = 0,
-            Vir = 0,
-            Du1 = 5,
-            tca1 = 10,
-            tia1 = 1,
-            tcr1 = 0,
-            tir1 = 0,
-            Dd1 = 5,
-            Ploss = inPloss)
+mat1 = expand.grid(Ploss = seq(0.1,0.9,0.1), upd = seq(2, 20, 2))
+opt = matrix(NA,nrow = dim(mat1)[1], ncol = 4)
+for(i in 1:dim(mat1)[1]){
+  op = optim(par = c(c(Nin = log(5),htmira = log(41.41))), 
+             fn = outcome, Ploss = mat1[i,"Ploss"], upd = mat1[i,"upd"])
   
-  op = optimize(f = outcome,lower = 1, upper = 1000, maximum = T,pars= PARS)
+  opt[i,1] = op$value
+  opt[i,2:3] = exp(op$par)
+  opt[i,4] = outcome(op$par, Ploss = mat1[i,"Ploss"], upd = mat1[i,"upd"],rtPca = T)
   
-  A = outcome(floor(op$maximum), pars=PARS)
-  B = outcome(ceiling(op$maximum), pars=PARS)
+}
+
+opt = cbind(mat1, opt)
+colnames(opt)[3:6] = c("value", "Nin", "htmira", "Pca")
+
+plot(htmira~Ploss, data = subset(opt, htmira < 1000 & upd == 2), type ="l")
+
+png("Plots/FigureS23.png", width = 8, height =5, units = "in", res = 600)
+
+plot(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.2), type ="l", 
+     ylim = c(60,100), col = "blue", lwd = 2,
+     xlab = "Spider ability to distinguish grasshoppers and woodlices (upd)",
+     ylab = "Optimal spider height (cm)")
+points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.4 & Nin > 0.5), type ="p", lwd = 2, col = "blue")
+points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.4), type ="l", lwd = 2, col = "orange")
+points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.4 & Nin > 0.5), type ="p", lwd = 2, col = "orange")
+points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.6), type ="l", lwd = 2, col = "purple")
+points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.6 & Nin > 0.5), type ="p", lwd = 2, col = "purple")
+points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.8), type ="l", lwd = 2, col = "cyan")
+points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.8 & Nin > 0.5), type ="p", lwd = 2, col = "cyan", cex = 2)
+legend("topright", legend = seq(0.2, 0.8, by= 0.2),
+       col = c("blue", "orange", "purple", "cyan"),
+       lwd = 2, lty = 1, title = "Probability of prey loss per chance to attack",
+       bty = 'n')
+dev.off()
+
+
+
+# 2. The net energy gain if spiders always attack ----
+
+alwaysattack <- function(HTMIRA = log(41.41), success.rate = 0.25, 
+                         en.per.day = 0.8, # Taken from data in Miller et al. 2014
+                         Woodlice = T){
   
-  if(A>B){
-    ppp = c(objective = A, maximum = floor(op$maximum))
+  tca1 = 20
+  tia1 = 0.5
+  
+  htmira = exp(HTMIRA)
+  
+  TEMP = 25 + htmira*0.1
+  
+  TEMP = ifelse(TEMP > 35, 35, TEMP)
+  
+  stdM = stdE(TEMP)
+  actM = actE(TEMP)
+  
+  
+  # Grasshopper energy content times ingestion efficiency and assimilation efficiency
+  Vca = (33.81*0.85*0.95 - (actM - stdM)*tca1)*success.rate - # attacked correctly and got it
+    (actM - stdM)*tia1*(1-success.rate) # attacked correctly and missed
+  Via = -(actM - stdM)*tia1 # attacked incorrectly
+  
+  OVERLAP = calc.overlap(htmira)
+  
+  Pd = ifelse(OVERLAP[2] > 1e-5, OVERLAP[2]/(OVERLAP[3] + OVERLAP[2]), 1e-5)
+  
+  # eatting is so useful the spiders hit everything
+  
+  if(Woodlice){
+    G.N = en.per.day*(Pd*Vca + (1-Pd)*Via) - (stdM - stdE(25))*8*60
   }else{
-    ppp = c(objective = B, maximum = ceiling(op$maximum))
+    G.N = en.per.day*(Pd*Vca) - (stdM - stdE(25))*8*60
   }
   
-  return(ppp)
   
+  return(G.N)
   
 }
 
-scanp(0.25)
+HT = seq(10,90, 1)
 
-o1 = sapply(seq(0.01, 0.5, 0.01), FUN = scanp)
+PWL = sapply(log(HT), FUN = alwaysattack)
+MWL = sapply(log(HT), FUN = alwaysattack, Woodlice = F)
 
-o2 = cbind(t(o1), Ploss = seq(0.01, 0.5, 0.01))
+plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)")
+rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "grey", border = "grey")
+abline(v = 41.41, lty = 2)
+points(PWL~HT, type ="l", lwd = 3, col = "blue")
+points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
+       lty = c(1,2), col = c("blue", "orange"), bty = "n")
 
-plot(maximum~Ploss, o2, type = "l")
-plot(objective~Ploss, o2, type = "l")
+# 3. Individual based simulation tracking spider movement ----
 
-# .....WRONG VERSION ----
-min.f1f2 <- function(x, mu1, mu2, sd1, sd2){
-  f1 <- dnorm(x, mean = mu1, sd = sd1)
-  f2 <- dnorm(x, mean = mu2, sd = sd2)
-  pmin(f1, f2)
+#calculate average movement from our data
+
+source("behaviour_March2019.R")
+
+touse = behaviour %>%
+  filter(Species == "PIMI") %>%
+  mutate(ID = paste0(Year, Block, Cage)) %>%
+  select(Time, ID, z)
+
+avg.cage = rep(NA, length(unique(touse$ID)))
+freq.move = avg.cage
+avg.cage2 = avg.cage
+
+for(i in 1:length(unique(touse$ID))){
+  touse2 = subset(touse, ID == unique(touse$ID)[i] & !is.na(z))
+  series = abs((touse2$z - lag(touse2$z, k = 1))[-1])
+  
+  freq.move[i] = length(series[series >0])/length(series)
+  
+  avg.cage2[i] = mean(series)
+  
+  if(any(series > 0)){
+    avg.cage[i] = mean(series[series > 0])
+  }else{
+    avg.cage[i] = NA
+  }
+  
 }
 
-fitCLARUS
-fitMIRA
 
-integrate(min.f1f2, 0, Inf, mu1 = 28.95, mu2 = 41.41, sd1 = 19.11, sd2 = 17.99)
+rand.mv = 0.1 # fit to overall movement data
+dist_mean = mean(avg.cage[!is.na(avg.cage)]) #2.1 in Miller et al. 2014
+dist_sd = sd(avg.cage[!is.na(avg.cage)]) #3.2 in Miller et al. 2014
+
+freq.move_mean = mean(freq.move[!is.na(freq.move)])
+
+freq.of.movement.cage = length(avg.cage[!is.na(avg.cage)])/length(avg.cage)
 
 
-integrate(min.f1f2, -Inf, Inf, mu1 = 28.95, mu2 = 41.41, sd1 = 10, sd2 = 10)
-
-
-min.f1f3 <- function(x, mu1, shape3, sd1, scale3){
-  f1 <- dnorm(x, mean = mu1, sd = sd1)
-  f3 <- rgamma(x, shape = shape3, scale = scale3)
-  pmin(f1, f3) # NOT CORRECT --> IT IS DOING THE UNION, NOT THE PROBABILITY OF ENCOUNTER!!
+simfunc <- function(steps = 100, reps = 100, Woodlice = T){
+  traj = matrix(NA, nrow = steps, ncol = reps)
+  
+  for(j in 1: reps){
+    
+    traj[1,j] = runif(1, 0, 100)
+    
+    for(i in 2:steps){
+      OVERLAP = calc.overlap(traj[(i-1),j])
+      
+      if(runif(1,0,1) <= OVERLAP[2]){
+        move = 0
+      }else{
+        if(runif(1,0,1) <= OVERLAP[3] & Woodlice |
+           runif(1,0,1) <= rand.mv){
+          move = rnorm(1, mean = dist_mean, sd = dist_sd)*sample(c(-1,1),1)
+        }else{
+          move = 0
+        }
+      }
+      
+      dest = traj[(i-1),j] + move
+      
+      traj[i,j] = ifelse(dest > 100 | dest < 0, traj[(i-1),j],dest)
+      
+    }
+  }
+  return(traj)
 }
 
-integrate(min.f1f3, 0, Inf, mu1 = 41.41, shape3 = 1.7, sd1 = 17.99, scale3 = 1.59)
+trajW = simfunc()
+traj0 = simfunc(Woodlice = F)
+
+plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
+     col = alpha("blue", 0.1),
+     xlab = "Time steps (30 minutes)", ylab = "Spider Height")
+rect(24, 0, 48, 2, col = "black", border = "black")
+for(i in 2:dim(trajW)[1]){
+  points(trajW[,i],col = alpha("blue", 0.1), type ="l")
+}
+for(i in 1:dim(traj0)[1]){
+  points(traj0[,i],col = alpha("orange", 0.1), type ="l")
+}
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(trajW,1, mean) - apply(trajW,1, sd),
+          rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
+        border = alpha("blue", 0.2), col = alpha("blue", 0.2))
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(traj0,1, mean) - apply(traj0,1, sd),
+          rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
+        border = alpha("orange", 0.2), col = alpha("orange", 0.2))
+
+points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
+points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
+
+
+
+hist(trajW[1,])
+hist(trajW[dim(trajW)[2],])
+
+pathdata = matrix(NA, nrow = dim(trajW)[1], ncol = 4)
+
+for(j in 1: dim(trajW)[1]){
+  mv = abs((trajW[,j] - lag(trajW[,j], k = 1))[-1])
+  pathdata[j,1] = mean(mv)
+  pathdata[j,2] = sd(mv)
+  pathdata[j,3] = length(mv[mv >0])/length(mv)
+  pathdata[j,4] = ifelse(max(mv[24:48])>0, 1,0)
+}
+
+pathdata2 = matrix(NA, nrow = dim(traj0)[1], ncol = 4)
+
+for(j in 1: dim(traj0)[1]){
+  mv = abs((traj0[,j] - lag(traj0[,j], k = 1))[-1])
+  pathdata2[j,1] = mean(mv)
+  pathdata2[j,2] = sd(mv)
+  pathdata2[j,3] = length(mv[mv >0])/length(mv)
+  pathdata2[j,4] = ifelse(max(mv[24:48])>0, 1,0)
+}
+
+check = data.frame(rbind(apply(pathdata,2, mean),
+                         apply(pathdata2,2, mean),
+      c(mean(avg.cage2[!is.na(avg.cage2)]),sd(avg.cage2[!is.na(avg.cage2)]), freq.move_mean,freq.of.movement.cage)))
+colnames(check) = c("Avg_move", "Sd_move", "Prob_move_time_step", "Prob_move_cage")
+check[,"Catagory"] = c("SimulationW", "Simulation0", "Expected")
+check
+
+
+
+
+write.csv(trajW,"SimRes/trajW_12Dec2019.csv", row.names = F)
+write.csv(traj0,"SimRes/traj0_12Dec2019.csv", row.names = F)
+
+# Final plot with all results ----
+
+png("Plots/Figure2.png", width = 10, height =5, units = "in", res = 600)
+
+par(mfrow=c(1,2))
+
+plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)",
+     xlim = c(0,100))
+rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "lightgrey", border = "lightgrey")
+abline(v = 41.41, lty = 2)
+points(PWL~HT, type ="l", lwd = 3, col = "blue")
+points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
+       lty = c(1,2), col = c("blue", "orange"), bty = "n")
+legend("topleft", legend = "A", bty = "n")
+
+
+plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
+     col = alpha("blue", 0.1),
+     xlab = "Time steps (30 minutes)", ylab = "Spider Height")
+rect(24, 0, 48, 2, col = "black", border = "black")
+
+for(i in 2:dim(trajW)[1]){
+  points(trajW[,i],col = alpha("blue", 0.1), type ="l")
+}
+for(i in 1:dim(traj0)[1]){
+  points(traj0[,i],col = alpha("orange", 0.1), type ="l")
+}
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(trajW,1, mean) - apply(trajW,1, sd),
+          rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
+        border = alpha("blue", 0.2), col = alpha("blue", 0.2))
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(traj0,1, mean) - apply(traj0,1, sd),
+          rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
+        border = alpha("orange", 0.2), col = alpha("orange", 0.2))
+
+points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
+points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
+legend("topleft", legend = "B", bty = "n")
+
+dev.off()

@@ -50,7 +50,7 @@ harvest <- MEScdata %>% separate(Plot, into=c("Block", NA), sep=1) %>%
       rename(Mf = GrLive) %>%
       mutate(Year = 2018, MStart = 3, Block = paste(Block)) %>%
       filter(Mf != 4) %>% # remove clear typo
-      full_join(read_csv("cageID2018.csv") %>% mutate(Block=paste(Block))) %>%
+      full_join(read_csv("Data/cageID2018.csv") %>% mutate(Block=paste(Block))) %>%
       mutate(Cage= paste(Cage))
     
   ) 

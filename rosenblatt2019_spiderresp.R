@@ -1,24 +1,29 @@
 # Analysis of Rosenblatt spider respiration rates
 
-rosenblatt = read_csv("Data/rosenblatt2019.csv") %>%
-  filter(!is.na(`20C`)) %>%
-  filter(Source == "CT") %>%
-  select(-Source) %>%
-  mutate(Block = letters[1:15]) %>%
-  gather(-Block, -Sex, -Weight, key = Temp, value = Resp) %>%
-  mutate(Resp = Resp*Weight) %>%
-  select(-Weight, - Sex) %>%
-  separate(Temp, into = c("Temp", NA), sep = 2) %>%
-  mutate(Temp = as.numeric(Temp)) %>%
-  filter(Block != "h")
+verbose = F
 
-
-summary(lme4::lmer(Resp~Temp + (1|Block), data = rosenblatt))
-plot(lme4::lmer(Resp~Temp + (1|Block), data = rosenblatt))
+if(verbose){
+  rosenblatt = read_csv("Data/rosenblatt2019.csv") %>%
+    filter(!is.na(`20C`)) %>%
+    filter(Source == "CT") %>%
+    select(-Source) %>%
+    mutate(Block = letters[1:15]) %>%
+    gather(-Block, -Sex, -Weight, key = Temp, value = Resp) %>%
+    mutate(Resp = Resp*Weight) %>%
+    select(-Weight, - Sex) %>%
+    separate(Temp, into = c("Temp", NA), sep = 2) %>%
+    mutate(Temp = as.numeric(Temp)) %>%
+    filter(Block != "h")
+  
+  
+  summary(lme4::lmer(Resp~Temp + (1|Block), data = rosenblatt))
+  plot(lme4::lmer(Resp~Temp + (1|Block), data = rosenblatt))
+  
+}
 
 # Respiratory quotient of 0.7 from A. Schmitz 2004
-# oxycalorific equivalent taken from Ford 1977
-# Congruence of the data suggest we can use Ford 1977 activity rates
+# oxycalorific equivalent 0.0200832 taken from Ford 1977
+# Congruence of the data suggest we can use Ford 1977 active metabolic rates
 
 x = seq(15, 40,1)
 y = (0.019891*x - 0.206382)*60*0.7*0.0200832
@@ -42,3 +47,5 @@ actE = approxfun(x,y2.min)
 
 stdE(20)
 actE(20)
+
+rm(act, std, x,y,y.min, y2.min, y2,verbose)
