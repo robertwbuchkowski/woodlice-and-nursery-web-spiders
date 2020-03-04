@@ -1,13 +1,9 @@
 # Code to run all three model simulations
 
-# 1. Signal-detection theory
-# 2. Always attack net energy gain
-# 3. Individual-based model
-
 require(brms)
 require(tidyverse)
 
-# Extract isopod data and build distribution ----
+# 1. Extract isopod data and build distribution ----
 
 ISOPOD <-
     # behaviour data from 2017
@@ -48,7 +44,7 @@ length(IP)/(length(IT)*6) # probability of being aboveground...convervative
 # where a conservative estimate of 40 -90 (mean = 80) % of the population is sheltering at a given
 # time. O. asellus is less heat tolerant, so maybe that is OK.
 
-# Load in Jennie's Excell data ----
+# 1.1 Load in Jennie's Excell data ----
 
 library(readxl)
 
@@ -152,10 +148,10 @@ outputf %>% filter(Pred == "mira" & Species == "Pred" & Var == "y") %>%
   filter(!is.na(V2)) %>%
   ggplot(aes(x=V2)) + geom_histogram() + theme_classic()
 
-# Determine the mean and sd heights from combined data ----
+# 1.2 Determine the mean and sd heights from combined data ----
 # Now I need to fit a random effects model with STAN to get the distributions
 
-# ....CLARUS ----
+# ....1.2.1 CLARUS ----
 
 CLARUS = outputf %>% filter(Pred == "rim"|Pred == "rima" & Species == "Pred" & Var == "y") %>%
   select(Rep, Year, V2) %>%
@@ -176,7 +172,7 @@ plot(fitCLARUS)
 summary(fitCLARUS)
 pairs(fitCLARUS)
 
-# ....ISOPOD ----
+# ....1.2.2 ISOPOD ----
 
 ISOPOD2 = ISOPOD %>%
   filter(z < 1e6) %>%
@@ -213,7 +209,7 @@ make_stancode(
   family= "gamma"
 )
 
-# .... MIRA ----
+# .... 1.2.3 MIRA ----
 # Now get the P. mira distribution (adding Jennie and our data together)
 
 MIRA = outputf %>% filter(Pred == "mira" & Species == "Pred" & Var == "y") %>%
@@ -245,7 +241,7 @@ lme4::lmer(V2~(1|Rep), data = MIRA)
 
 lme4::glmer(V2~(1|Rep), data=ISOPOD2, family = "Gamma")
 
-# .....FEMUR ----
+# .....1.2.4 FEMUR ----
 # Now get the grasshopper distribution (adding Jennie and our data together)
 
 FEMUR = outputf %>% filter(Pred == "mira" & Species == "GH" & Var == "y") %>%
@@ -275,7 +271,7 @@ pairs(fitMIRA)
 
 summary(lme4::lmer(V2~(1|Rep), data = FEMUR))
 
-# Put it all together ----
+# 1.4 Put it all together ----
 xs <- seq(0, 100, by = 0.1)
 fmira <- dnorm(xs, mean = 41.41, sd = 17.99)
 fclarus <- dnorm(xs, mean = 28.95, sd = 19.11)
@@ -288,7 +284,7 @@ points(xs~fclarus, type = "l", col ="blue")
 points(xs~fisopod, type = "l", col ="orange")
 points(xs~ffemur, type = "l", col ="green")
 
-# Calculate the probability of encounter based on distributions ----
+# 1.5 Calculate the probability of encounter based on distributions ----
 
 D1 = data.frame(Species = c("Clarus", "Femur", "Isopod"),
            Htmean = c(28.95, 54.48, NA),
@@ -342,7 +338,7 @@ calc.overlap <- function(htmira){
 calc.overlap(41.41)
 
 
-# Energy costs (Notes on data sources) ----
+# 1.6 Energy costs (Notes on data sources) ----
 
 # M. Ford 1977 and A. Schmitz 2004 have the metabolic data for other spiders that can be used
 # R. Wiegart has the energy content of grasshoppers 5388 cal/g DW
@@ -379,7 +375,7 @@ calc.overlap(41.41)
 
 # spider resting metabolism goes up higher in the canopy, so can discount this as well
 
-# 1. Signal detection theory functions ----
+# 2. Signal detection theory functions ----
 
 source("rosenblatt2019_spiderresp.R")
 
@@ -519,7 +515,7 @@ dev.off()
 
 
 
-# 2. The net energy gain if spiders always attack ----
+# 3. The net energy gain if spiders always attack ----
 
 alwaysattack <- function(HTMIRA = log(41.41), success.rate = 0.25, 
                          en.per.day = 0.8, # Taken from data in Miller et al. 2014
@@ -573,7 +569,7 @@ points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
 legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
        lty = c(1,2), col = c("blue", "orange"), bty = "n")
 
-# 3. Individual based simulation tracking spider movement ----
+# 4. Individual based simulation tracking spider movement ----
 
 #calculate average movement from our data
 
@@ -711,7 +707,7 @@ check
 write.csv(trajW,"SimRes/trajW_12Dec2019.csv", row.names = F)
 write.csv(traj0,"SimRes/traj0_12Dec2019.csv", row.names = F)
 
-# Final plot with all results ----
+# 5. Final plot with all results ----
 
 png("Plots/Figure2.png", width = 10, height =5, units = "in", res = 600)
 

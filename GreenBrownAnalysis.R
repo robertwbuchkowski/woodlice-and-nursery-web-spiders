@@ -99,7 +99,9 @@ bayes_R2(fit1)
 
 marginal_effects(fit1, points=T)
 
-# .......Including Brandon's prior ----
+# fit model 1.1: Used in the MS! ----
+
+# Including Brandon's prior
 # Spider
 # mean = -12.7
 # sd = 9.4
@@ -132,7 +134,7 @@ bayes_R2(fit1b)
 
 # no effect on qualitative outcome!
 
-# Fit model 1.5: only temperature----
+# Fit model 1.2: only temperature----
 
 fit1pt5 <- brm(
   mvbind(MEFE, PIMI) ~ Temp +(1|Year/Block),
@@ -225,7 +227,7 @@ marginal_effects(fit2)
 # Now estimate the brms model using the example online:
 # https://cran.r-project.org/web/packages/brms/vignettes/brms_nonlinear.html
 
-# ........fit model 2 without random effects ----
+# fit model 2.1: without random effects ----
 prior2pt0 <- get_prior(
   Mf~attack,
   data=hartomod2,
@@ -262,7 +264,7 @@ model2 = glmer(Mf~attack + (1|Year), data=hartomod2, family=poisson())
 
 summary(model2)
 
-# ........fit model 2 (3) with binomial distribution ----
+# fit model 2.2 with binomial distribution: Used in MS ----
 
 # Modify the hartomod so it can be a binomial model
 hartomod3 = hartomod %>%
@@ -292,7 +294,7 @@ summary(fit3pt0)
 plot(fit3pt0)
 bayes_R2(fit3pt0)
 
-# ........Fit model with annual temp and treat effect -----
+# Create SI Graphics -----
 
 suppfigdata <- hartomod %>% filter(Temp=="C") %>% group_by(Year, Treatment) %>%
   summarize(sdMf = sd(Mf, na.rm=T),
@@ -395,7 +397,7 @@ hartomod %>% filter(Temp=="C")%>%
   geom_point() + theme_classic() +
   scale_shape_manual(values=shapevec,name="Year")
 
-# Create graphics for height and survival data ----
+# Create Figure 1 graphic ----
 
 hartomod_axis <- hartomod %>% mutate(XAXIS = paste0(Temp,Treatment))
 
@@ -485,7 +487,7 @@ harvest %>% filter(Year == 2013) %>%
   select(Treatment, Block, Mf) %>% group_by(Treatment) %>%
   summarize(Mfsd = sd(Mf), Mf = mean(Mf))
 
-# Full model example -----
+# Full model example: Not used in this final version -----
 
 prior<- get_prior(
   bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
@@ -544,7 +546,7 @@ bayes_R2(fit_full)
 marginal_effects(fit_full, "Treatment")
 
 
-# Full model example with mvbind -----
+# Full model example with mvbind
 
 prior<- get_prior(
   bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
