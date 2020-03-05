@@ -278,11 +278,18 @@ fclarus <- dnorm(xs, mean = 28.95, sd = 19.11)
 fisopod <- dgamma(xs, shape = 1.7, scale = 1.59)
 ffemur <- dnorm(xs, mean = 54.48, sd = 19.39)
 
+png("Plots/height_dist.png", width = 5, height =5, units = "in", res = 600)
 plot(xs~fmira, type = "l", xlim = c(0, max(fmira, fclarus, fisopod)),
-     ylab = "Height", xlab = "Frequency")
-points(xs~fclarus, type = "l", col ="blue")
-points(xs~fisopod, type = "l", col ="orange")
-points(xs~ffemur, type = "l", col ="green")
+     ylab = "Height (cm)", xlab = "Frequency", lwd = 3)
+# points(xs~fclarus, type = "l", col ="green", lwd = 3)
+points(xs~fisopod, type = "l", col ="orange", lwd = 3)
+points(xs~ffemur, type = "l", col ="blue", lwd = 3)
+legend("topright", legend = c(expression(italic("Pisaurina mira"),
+                                         # italic("Phiddipus clarus"),
+                                         italic("Oniscus asellus"),
+                                         italic("Melanoplus femurrubrum"))),
+       col = c("black", "orange", "blue"), lty = 1, lwd =3, bty = "n")
+dev.off()
 
 # 1.5 Calculate the probability of encounter based on distributions ----
 
@@ -379,7 +386,7 @@ calc.overlap(41.41)
 
 source("rosenblatt2019_spiderresp.R")
 
-outcome <- function(VAR,Ploss = 0.25, upd = 2.5,success.rate = 0.25, Woodlice = T, rtPca = F){
+outcome <- function(VAR,Ploss = 0.25, upd = 2.5,success.rate = 0.25, Woodlice = T, rtPca = F, manualVia = 0){
   
   with(as.list(c(VAR)),{
 
@@ -404,7 +411,8 @@ outcome <- function(VAR,Ploss = 0.25, upd = 2.5,success.rate = 0.25, Woodlice = 
     # Grasshopper energy content times ingestion efficiency and assimilation efficiency
     Vca = (33.81*0.85*0.95 - (actM - stdM)*tca1)*success.rate - # attacked correctly and got it
       (actM - stdM)*tia1*(1-success.rate) # attacked correctly and missed
-    Via = -(actM - stdM)*tia1 # attacked incorrectly
+    
+    Via = -(actM - stdM)*tia1 - manualVia # attack incorrectly plus added cost, which defaults to zero
     
     N = 1 + exp(Nin)
     
@@ -433,7 +441,8 @@ outcome <- function(VAR,Ploss = 0.25, upd = 2.5,success.rate = 0.25, Woodlice = 
     
     W.N = G.N*(1-Ploss)^N # Still in units of Joules
     
-    negcost = -(W.N + (stdM - stdE(25))*8*60)
+    negcost = -(W.N + # expected gains or loss from interactions
+                  (stdM - stdE(25))*8*60) # respiration costs associated with foraging higher in the canopy. Corrects the optimal height chosen for 8 hours of sitting and waiting for prey.
     
     
     # We use the function of LOCO, because we don't think the other two are easily 
@@ -450,7 +459,6 @@ outcome <- function(VAR,Ploss = 0.25, upd = 2.5,success.rate = 0.25, Woodlice = 
   })
 }
 
-
 outcome(c(Nin = log(5),htmira = log(41.41)))
 
 op = optim(par = c(c(Nin = log(5),htmira = log(41.41))), fn = outcome)
@@ -461,7 +469,37 @@ op2 = optim(par = c(c(Nin = log(10),htmira = log(41.41))), fn = outcome, Woodlic
 
 exp(op2$par)
 
-# Explore outcomes over htmira and Nin values
+# 2.1 Optimal outcome based on increased cost of attacking woodlice ----
+
+mVseq = c(0.001,0.01, 0.1, 1, 10, 100, 1000) # extra cost of attack added
+
+optmV = matrix(NA, nrow = length(mVseq), ncol = 2)
+
+for(i in 1:length(mVseq)){
+  op3 = optim(par = c(c(Nin = log(5),htmira = log(41.41))), fn = outcome,
+        manualVia = mVseq[i], method = "L-BFGS-B", lower = c(-1e6, -1e6), upper = c(4.60517,4.60517))
+  
+  optmV[i,] = op3$par
+}
+
+optmV = data.frame(cbind(mVseq, exp(optmV)))
+colnames(optmV) = c("mV", "N", "Htmira")
+
+
+par(mfrow=c(2,1), mar = c(5,4,2,2)+0.1)
+plot(Htmira~mV, data = optmV, type = "b", log = "x", ylim = c(0,100),
+     xlab = "Additional cost of attacking woodlouse (J)",
+     ylab = "Optimal spider height (cm)")
+abline(v = 0.0055, lty = 2)
+text(x = 0.05, y = 90, labels = "Baseline cost")
+
+plot(N~mV, data = optmV, type = "b", log = "x",
+     xlab = "Additional cost of attacking woodlouse (J)",
+     ylab = "Optimal number of spider attacks")
+abline(v = 0.0055, lty = 2)
+text(x = 0.05, y = 4, labels = "Baseline cost")
+
+# 2.2 Explore outcomes over htmira and Nin values ----
 
 mat1 = log(expand.grid(Nin = seq(1,40,5), htmira = seq(1, 100, 10)))
 opt = rep(NA,dim(mat1)[1])
@@ -492,13 +530,32 @@ for(i in 1:dim(mat1)[1]){
 opt = cbind(mat1, opt)
 colnames(opt)[3:6] = c("value", "Nin", "htmira", "Pca")
 
-plot(htmira~Ploss, data = subset(opt, htmira < 1000 & upd == 2), type ="l")
 
-png("Plots/FigureS23.png", width = 8, height =5, units = "in", res = 600)
+# Scan optim across increasing attack success rate
 
+mat1 = expand.grid(Ploss = c(0.25,0.8), upd = c(2.5, 20), success.rate = seq(0.1, 0.9, by = 0.05), manualVia = c(0, 1))
+opt2 = matrix(NA,nrow = dim(mat1)[1], ncol = 4)
+for(i in 1:dim(mat1)[1]){
+  op = optim(par = c(c(Nin = log(5),htmira = log(41.41))), 
+             fn = outcome, Ploss = mat1[i,"Ploss"], upd = mat1[i,"upd"], success.rate = mat1[i,"success.rate"], manualVia = mat1[i, "manualVia"])
+  
+  opt2[i,1] = op$value
+  opt2[i,2:3] = exp(op$par)
+  opt2[i,4] = outcome(op$par, Ploss = mat1[i,"Ploss"], upd = mat1[i,"upd"],rtPca = T)
+  
+}
+colnames(opt2) = c("value", "Nin", "htmira", "Pca")
+
+opt2 = cbind(mat1, opt2)
+
+png("Plots/FigureS3.png", width = 10, height =5, units = "in", res = 600)
+
+par(mfrow=c(1,2), mar = c(5,4,2,2)+0.1)
+
+# Panel A
 plot(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.2), type ="l", 
-     ylim = c(60,100), col = "blue", lwd = 2,
-     xlab = "Spider ability to distinguish grasshoppers and woodlices (upd)",
+     ylim = c(0,150), col = "blue", lwd = 2,
+     xlab = expression(Spider~ability~to~distinguish~grasshoppers~and~woodlice~(u[pd])),
      ylab = "Optimal spider height (cm)")
 points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.4 & Nin > 0.5), type ="p", lwd = 2, col = "blue")
 points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.4), type ="l", lwd = 2, col = "orange")
@@ -507,19 +564,45 @@ points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.6), type ="l", 
 points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.6 & Nin > 0.5), type ="p", lwd = 2, col = "purple")
 points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.8), type ="l", lwd = 2, col = "cyan")
 points(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.8 & Nin > 0.5), type ="p", lwd = 2, col = "cyan", cex = 2)
-legend("topright", legend = seq(0.2, 0.8, by= 0.2),
+legend("bottomright", legend = seq(0.2, 0.8, by= 0.2),
        col = c("blue", "orange", "purple", "cyan"),
-       lwd = 2, lty = 1, title = "Probability of prey loss per chance to attack",
+       lwd = 2, lty = 1, title = expression(Probability~of~prey~loss~per~attack~chance~(P[loss])),
        bty = 'n')
-dev.off()
+legend("topleft", legend = "A", bty = 'n')
 
+# Panel B
+plot(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 2.5 & manualVia == 0), ylim = c(0,150), type = "n", xlab = "Success Rate (proportion)", ylab = "")
+
+abline(v = 0.25, lty = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 2.5 & manualVia == 0), type = "l", col = "black", lwd = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 2.5 & manualVia == 0 & Nin > 0.5), type = "p", col = "black", lwd = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.8 & upd == 2.5 & manualVia == 0), type = "l", col = "cyan", lwd = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.8 & upd == 2.5 & manualVia == 0 & Nin > 0.5), type = "p", col = "cyan", lwd = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 20 & manualVia == 0), type = "l", col = "green", lwd = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 20 & manualVia == 0 & Nin > 0.5), type = "p", col = "green", lwd = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 2.5 & manualVia == 1), type = "l", col = "magenta", lwd = 2)
+
+points(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 2.5 & manualVia == 1 & Nin >0.5), type = "p", col = "magenta", lwd = 2)
+
+text(x = 0.15, y = 20, labels = "Baseline")
+legend("bottomright", legend = c("Basline scenario", expression(P[loss]==0.8), expression(u[pd]==20), "Attack cost + 1J"), bty = "n", lty = 1, col = c("black", "cyan", "green", "magenta"), lwd = 2)
+legend("topleft", legend = "B", bty = 'n')
+
+dev.off()
 
 
 # 3. The net energy gain if spiders always attack ----
 
 alwaysattack <- function(HTMIRA = log(41.41), success.rate = 0.25, 
                          en.per.day = 0.8, # Taken from data in Miller et al. 2014
-                         Woodlice = T){
+                         Woodlice = T, manualVia = 0){
   
   tca1 = 20
   tia1 = 0.5
@@ -537,7 +620,7 @@ alwaysattack <- function(HTMIRA = log(41.41), success.rate = 0.25,
   # Grasshopper energy content times ingestion efficiency and assimilation efficiency
   Vca = (33.81*0.85*0.95 - (actM - stdM)*tca1)*success.rate - # attacked correctly and got it
     (actM - stdM)*tia1*(1-success.rate) # attacked correctly and missed
-  Via = -(actM - stdM)*tia1 # attacked incorrectly
+  Via = -(actM - stdM)*tia1 - manualVia # attacked incorrectly plus manual overide
   
   OVERLAP = calc.overlap(htmira)
   
@@ -560,6 +643,14 @@ HT = seq(10,90, 1)
 
 PWL = sapply(log(HT), FUN = alwaysattack)
 MWL = sapply(log(HT), FUN = alwaysattack, Woodlice = F)
+PWLp3 = sapply(log(HT), FUN = alwaysattack, Woodlice = T, manualVia = 1)
+PWLp4 = sapply(log(HT), FUN = alwaysattack, Woodlice = T, manualVia = 10)
+
+PWLsr50 = sapply(log(HT), FUN = alwaysattack, Woodlice = T, success.rate = 0.5)
+PWLsr75 = sapply(log(HT), FUN = alwaysattack, Woodlice = T, success.rate = 0.75)
+
+MWLsr50 = sapply(log(HT), FUN = alwaysattack, Woodlice = F, success.rate = 0.5)
+MWLsr75 = sapply(log(HT), FUN = alwaysattack, Woodlice = F, success.rate = 0.75)
 
 plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)")
 rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "grey", border = "grey")
@@ -568,6 +659,63 @@ points(PWL~HT, type ="l", lwd = 3, col = "blue")
 points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
 legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
        lty = c(1,2), col = c("blue", "orange"), bty = "n")
+
+
+plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)")
+rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "grey", border = "grey")
+abline(v = 41.41, lty = 2)
+points(PWLp3~HT, type ="l", col = "darkblue", lty = 1, lwd = 3)
+points(PWL~HT, type ="l", lwd = 3, col = "blue")
+points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+legend("bottomright", legend = c("Woodlice", "No woodlice", "Woodlice\n (+ 1J attack cost)"), lwd = 3, 
+       lty = c(1,2), col = c("blue", "orange", "darkblue"), bty = "n")
+
+
+# Add together the signal detection results and the always attack results
+
+png("Plots/FigureS6.png", width = 8, height =8, units = "in", res = 600)
+par(mfcol=c(2,2), mar = c(5,4,2,2)+0.1)
+plot(Htmira~mV, data = optmV, type = "b", log = "x", ylim = c(0,100),
+     xlab = "Additional cost of attacking woodlouse (J)",
+     ylab = "Optimal spider height (cm)")
+abline(v = 0.0055, lty = 2)
+text(x = 0.05, y = 90, labels = "Baseline cost")
+legend("topleft", legend = "A", bty = "n")
+
+plot(N~mV, data = optmV, type = "b", log = "x",
+     xlab = "Additional cost of attacking woodlouse (J)",
+     ylab = "Optimal number of spider attacks")
+abline(v = 0.0055, lty = 2)
+text(x = 0.05, y = 4, labels = "Baseline cost")
+legend("topleft", legend = "B", bty = "n")
+
+plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)")
+rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "grey", border = "grey")
+abline(v = 41.41, lty = 2)
+points(PWLp4~HT, type ="l", col = "black", lty = 1, lwd = 3)
+points(PWLp3~HT, type ="l", col = "blue", lty = 1, lwd = 3)
+points(PWL~HT, type ="l", lwd = 3, col = "lightblue")
+points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+legend("topleft", legend = "C", bty = "n")
+
+plot(PWLsr75~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)",
+     ylim = c(0,15))
+rect(41.41 - 17.99, -1, 41.41 + 17.99, 20, col = "grey", border = "grey")
+abline(v = 41.41, lty = 2)
+points(PWL~HT, type ="l", lwd = 3, col = "lightblue")
+points(PWLsr50~HT, type ="l", lwd = 3, col = "blue")
+points(PWLsr75~HT, type ="l", col = "darkblue", lwd = 3)
+
+points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+points(MWLsr50~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+points(MWLsr75~HT, type ="l", col = "darkorange", lty = 3, lwd = 3)
+legend("topleft", legend = "C", bty = "n")
+
+plot(PWL~HT, type ="n", bty = "n", xaxt = "n", yaxt = "n", ylab = "", xlab = "")
+legend("center", legend = c("No woodlice", "Woodlice", "Woodlice (+ 1J attack cost)","Woodlice (+ 10J attack cost)"), lwd = 3, 
+       lty = c(2,1,1,1), col = c("orange", "lightblue", "blue", "black"), bty = "n")
+dev.off()
+
 
 # 4. Individual based simulation tracking spider movement ----
 

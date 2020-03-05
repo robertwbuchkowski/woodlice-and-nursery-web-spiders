@@ -397,6 +397,21 @@ hartomod %>% filter(Temp=="C")%>%
   geom_point() + theme_classic() +
   scale_shape_manual(values=shapevec,name="Year")
 
+# Create a graphic showing the P. mira body sizes measured in 2015
+
+png("Plots/suppfigure3_05March2020.png", width=8, height=4, units="in", res=600)
+ggpubr::ggarrange(
+  read_csv("Data/Cage_data.csv") %>%
+    ggplot(aes(x = Pm_body_Sept)) + geom_histogram(bins = 10) + theme_classic() + xlab("Spider body length (cm)"),
+  read_csv("Data/Cage_data.csv") %>%
+    ggplot(aes(x = Pm_body_Sept, y = MF_Sept)) + geom_point() + theme_classic() + xlab("Spider body length (cm)") + ylab("Grasshoppers surviving in September"),
+  labels = "AUTO"
+)
+dev.off()
+
+
+
+
 # Create Figure 1 graphic ----
 
 hartomod_axis <- hartomod %>% mutate(XAXIS = paste0(Temp,Treatment))
