@@ -81,10 +81,8 @@ fit1 <- brm(
 
 Resid.brm <- residuals(fit1, type='pearson')
 Fitted.brm <- fitted(fit1, scale='linear')
-ggplot(data=NULL, aes(y=Resid.brm[,,1][,'Estimate'], x=Fitted.brm[,,1][,'Estimate'])) + 
-  geom_point() + theme_classic()
-ggplot(data=NULL, aes(y=Resid.brm[,,2][,'Estimate'], x=Fitted.brm[,,2][,'Estimate'])) + 
-  geom_point() + theme_classic()
+ggplot(data=NULL, aes(y=Resid.brm[,,1][,'Estimate'], x=Fitted.brm[,,1][,'Estimate'])) + geom_point() + theme_classic()
+ggplot(data=NULL, aes(y=Resid.brm[,,2][,'Estimate'], x=Fitted.brm[,,2][,'Estimate'])) + geom_point() + theme_classic()
 
 # add_loo(fit1)
 summary(fit1)
@@ -134,17 +132,24 @@ bayes_R2(fit1b)
 
 # no effect on qualitative outcome!
 
-# Fit model 1.2: only temperature----
+# Fit model 1.2: removing behavioural cages from 2018 that lost data ----
 
-fit1pt5 <- brm(
-  mvbind(MEFE, PIMI) ~ Temp +(1|Year/Block),
-  data=hartomod %>% filter(Year == 2018), 
-  chains=2, cores=2,
-  control = list(adapt_delta=0.99)
+# Create new dataset without these cages
+lostafternoon = c("17", "21",  "22", "37", "38", "42")
+
+temphartomod = hartomod %>% filter(!(Year ==2018 & Cage %in% lostafternoon))
+
+fit1c <- brm(
+  mvbind(MEFE, PIMI) ~ Treatment*Temp +(1|Year/Block),
+  data=temphartomod, chains=1, iter = 10000,
+  control = list(adapt_delta=0.99), prior=prior1
 )
 
-summary(fit1pt5) # no effect of temperature
-plot(fit1pt5)
+summary(fit1c)
+plot(fit1c)
+bayes_R2(fit1c)
+
+rm(temphartomod, lostafternoon)
 
 # fit model 2----
 # predict the relationship between theoretical attack rate and grasshopper survival
@@ -294,7 +299,7 @@ summary(fit3pt0)
 plot(fit3pt0)
 bayes_R2(fit3pt0)
 
-# Create SI Graphics -----
+# Create SI Figure S2 -----
 
 suppfigdata <- hartomod %>% filter(Temp=="C") %>% group_by(Year, Treatment) %>%
   summarize(sdMf = sd(Mf, na.rm=T),
@@ -361,7 +366,7 @@ sp3 <- suppfigdata %>%
   scale_x_continuous(limits = c(18,24)) +
   xlab("Average August temperature")
 
-png("suppfigure2_21Oct2019.png", width=8, height=4, units="in", res=600)
+png("Plots/FigureS2.png", width=8, height=4, units="in", res=600)
 cowplot::plot_grid(NULL,
                    cowplot::get_legend(sp1 + theme(legend.position = "top")),
                    NULL,
@@ -399,7 +404,7 @@ hartomod %>% filter(Temp=="C")%>%
 
 # Create a graphic showing the P. mira body sizes measured in 2015
 
-png("Plots/suppfigure3_05March2020.png", width=8, height=4, units="in", res=600)
+png("Plots/FigureS3.png", width=8, height=4, units="in", res=600)
 ggpubr::ggarrange(
   read_csv("Data/Cage_data.csv") %>%
     ggplot(aes(x = Pm_body_Sept)) + geom_histogram(bins = 10) + theme_classic() + xlab("Spider body length (cm)"),
@@ -408,9 +413,6 @@ ggpubr::ggarrange(
   labels = "AUTO"
 )
 dev.off()
-
-
-
 
 # Create Figure 1 graphic ----
 
@@ -454,17 +456,14 @@ p2 = hartomod_axis %>% ggplot(aes(x=XAXIS)) +
 
 plt_dat <- marginal_effects(fit3pt0) # added model without random effects
 p3 = ggplot() + 
-  geom_ribbon(data=plt_dat$attack, 
-              aes(x=attack,ymin=lower__, ymax=upper__),
-              alpha=0.5) +
-  geom_line(data=plt_dat$attack, aes(x=attack,y=estimate__), size=3) +
+  geom_ribbon(data=plt_dat$attack, aes(x=attack,ymin=lower__, ymax=upper__),alpha=0.1) +
+  geom_line(data=plt_dat$attack, aes(x=attack,y=estimate__), size=2) +
   geom_jitter(data= hartomod2, aes(x=attack, y=Mf,color=Block, shape=as.factor(Year)),
               width=0, height=0.1, size=3) + theme_classic() +
   xlab(expression(Predicted~Attack~Rate~(time^-1))) + 
   ylab(expression(italic(M.~femurrubrum)~survival~("#")))+ 
   scale_shape_manual(values=shapevec,name="Year") +
-  annotate("text", y = 2.5, x = 0.015, label = expression(R[Bayes]^2==0.24)) +
-  ylim(0,4)
+  annotate("text", y = 2.5, x = 0.015, label = expression(R[Bayes]^2==0.24)) + ylim(-0.1, 4)
 
 p4 = ggplot() + 
   geom_violin(data= hartomod_axis, aes(x=XAXIS, y=Mf)) +
@@ -476,14 +475,14 @@ p4 = ggplot() +
                                   color=Block, shape=as.factor(Year)),
               size=3,width=0.3, height=0.3) + 
   scale_shape_manual(values=shapevec,name="Year") +
-  ylim(0,4) +
+  ylim(-0.1,4) +
   scale_x_discrete(breaks=c("CSG","CSIG","WSG", "WSIG"),
                    labels=c("Ambient \n No woodlice",
                             "Ambient \n Woodlice",
                             "Warmed \n No woodlice",
                             "Warmed \n Woodlice"))
 
-png("figure_21Oct2019.png", width=8, height=8, units="in", res=600)
+png("Plots/Figure1.png", width=8, height=8, units="in", res=600)
 cowplot::plot_grid(cowplot::get_legend(p4 + theme(legend.position = "top") +
                                          scale_color_discrete(guide=F)),
                    cowplot::get_legend(p4 + theme(legend.position = "top") +
@@ -497,118 +496,11 @@ cowplot::plot_grid(cowplot::get_legend(p4 + theme(legend.position = "top") +
                    labels=c("", "", "A", "B", "C", "D"))
 dev.off()
 
-# use 2013 grasshopper data as a prior for the model
-harvest %>% filter(Year == 2013) %>% 
-  select(Treatment, Block, Mf) %>% group_by(Treatment) %>%
-  summarize(Mfsd = sd(Mf), Mf = mean(Mf))
 
-# Full model example: Not used in this final version -----
+# Analyze the wolf spider data -----
 
-prior<- get_prior(
-  bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
-     MEFE ~ Treatment + (1|Year),
-     PIMI ~ Treatment + (1|Year),
-     MEFEsd ~ Treatment + (1|Year),
-     PIMIsd ~ Treatment + (1|Year),
-     aprime ~ 1,
-     nl = TRUE),
-  data=hartomod, family = gaussian()
-)
-
-prior$prior[2] <- "normal(30, 100)" # set prior on aprime
-prior$prior[c(5,17)] <- "normal(50, 20)" # set intercept priors MEFE & PIMI
-prior$prior[c(6,18)] <- "normal(0, 20)" # set slope priors MEFE & PIMI
-
-make_stancode(
-  bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
-     MEFE ~ Treatment + (1|Year),
-     PIMI ~ Treatment + (1|Year),
-     MEFEsd ~ Treatment + (1|Year),
-     PIMIsd ~ Treatment + (1|Year),
-     aprime ~ 1,
-     nl = TRUE),
-  data=hartomod, family = gaussian(),chains = 1,
-  prior= prior)
-
-fit_full <- brm(
-  bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
-     MEFE ~ Treatment + (1|Year),
-     PIMI ~ Treatment + (1|Year),
-     MEFEsd ~ Treatment + (1|Year),
-     PIMIsd ~ Treatment + (1|Year),
-     aprime ~ 1,
-     nl = TRUE),
-  data=hartomod, family = gaussian(),chains = 2,
-  prior= prior,
-  control = list(adapt_delta = 0.99)
-)
-
-summary(fit_full)
-plot(fit_full)
-
-png("pairs_fit_full.png", width=10, height=10, units="in", res=400)
-pairs(fit_full, pars=c("MEFE_Intercept", "MEFE_TreatmentSIG",
-                       "MEFEsd_Intercept", "MEFEsd_TreatmentSIG"))
-pairs(fit_full, pars=c("PIMI_Intercept", "PIMI_TreatmentSIG"))
-dev.off()
-
-pp_check(fit_full, resp="MEFE")
-pp_check(fit_full, resp="PIMI")
-pp_check(fit_full, resp="Mf")
-
-bayes_R2(fit_full)
-
-marginal_effects(fit_full, "Treatment")
-
-
-# Full model example with mvbind
-
-prior<- get_prior(
-  bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
-     mvbind(MEFE,PIMI,MEFEsd,PIMIsd) ~ Treatment + (1|Year),
-     aprime ~ 1,
-     nl = TRUE),
-  data=hartomod, family = gaussian()
-)
-
-prior$prior[2] <- "normal(30, 100)" # set prior on aprime
-prior$prior[c(5,17)] <- "normal(50, 20)" # set intercept priors MEFE & PIMI
-prior$prior[c(6,18)] <- "normal(0, 20)" # set slope priors MEFE & PIMI
-
-make_stancode(
-  bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
-     mvbind(MEFE,PIMI,MEFEsd,PIMIsd) ~ Treatment + (1|Year),
-     aprime ~ 1,
-     nl = TRUE),
-  data=hartomod, family = gaussian(),chains = 1,
-  prior= prior)
-
-fit_full2 <- brm(
-  bf(Mf ~ sqrt(2*3.14*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))/aprime*exp((-1*(PIMI - MEFE)*(PIMI - MEFE))/(2*(PIMIsd*PIMIsd + MEFEsd*MEFEsd))),
-     MEFE ~ Treatment + (1|Year),
-     PIMI ~ Treatment + (1|Year),
-     MEFEsd ~ Treatment + (1|Year),
-     PIMIsd ~ Treatment + (1|Year),
-     aprime ~ 1,
-     nl = TRUE),
-  data=hartomod, family = gaussian(),chains = 2,
-  prior= prior,
-  control = list(adapt_delta = 0.99)
-)
-
-summary(fit_full2)
-plot(fit_full2)
-
-png("pairs_fit_full2.png", width=10, height=10, units="in", res=400)
-pairs(fit_full2, pars=c("MEFE_Intercept", "MEFE_TreatmentSIG",
-                       "MEFEsd_Intercept", "MEFEsd_TreatmentSIG"))
-pairs(fit_full2, pars=c("PIMI_Intercept", "PIMI_TreatmentSIG"))
-dev.off()
-
-pp_check(fit_full2, resp="MEFE")
-pp_check(fit_full2, resp="PIMI")
-pp_check(fit_full2, resp="Mf")
-
-bayes_R2(fit_full2)
-
-marginal_effects(fit_full2, "Treatment")
+read_csv("Data/Behaviour2017.csv") %>%
+  filter(Cage %in% c("D", "E")) %>%
+  group_by(Animal, Cage) %>%
+  summarize(sd = sd(z, na.rm = T), height = mean(z, na.rm = T)) %>%
+  filter(Animal != "ONAS")

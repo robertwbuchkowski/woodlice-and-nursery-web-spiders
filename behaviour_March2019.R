@@ -78,17 +78,24 @@ behaviour <-read_csv("Data/behaviour_dataR.csv") %>% select(-X1) %>%
   mutate(Block = "1", Year = 2015, x=NA) %>%
   left_join( # get treatment information from the harvest data set
     harvest2015 %>% select(Cage, Treatment)
-    ) %>% mutate(Cage = paste(Cage)) %>% filter(!is.na(z)) %>% bind_rows(
+    ) %>% mutate(Cage = paste(Cage)) %>% filter(!is.na(z)) %>% 
+  
+  
+  bind_rows(
       # behaviour data from 2017
-      read_csv("Data/Data_Sheet_Behaviour_FinalFinal.csv") %>% 
+      read_csv("Data/Behaviour2017.csv") %>% 
         filter(Animal %in% c("MEFE", "PIMI") & !is.na(z)) %>%
-        select(-Time, -Hour, -Minute, -Disturbed, -Notes) %>% 
-        rename(Species = Animal) %>% 
+        select(-Hour, -Minute, -Disturbed, -Notes) %>%
+        filter(Cage %in% c("A", "B", "C")) %>%
+        rename(Species = Animal) %>%
         left_join( # Add treatment information from the harvest data set
           harvest2017 %>% select(Block, Cage, LTreatment) %>% rename(Treatment = LTreatment)
         ) %>%
         mutate(Year = 2017,Doy = 209, Block = paste(Block))
-    ) %>% mutate(Temp = "C") %>% bind_rows(
+    ) %>% mutate(Temp = "C") %>% 
+  
+  
+  bind_rows(
       # add 2018 behaviour data
       read_csv("Data/grasshopper_Stefanie.csv") %>% 
         separate(Time, into=c("Hour", "Minute", "Second"),sep=":") %>%

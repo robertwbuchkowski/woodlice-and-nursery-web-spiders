@@ -33,4 +33,8 @@ The fourth section runs the random movement simulations based on the decision ru
 
 The fifth section produces the plots for the MS.
 
+1 versus 3 dimensions: compare_1D_3D.R
+
+Compares the 1-D separation and the 3-D separation and produces Figure S1
+
 

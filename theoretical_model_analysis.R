@@ -548,9 +548,11 @@ colnames(opt2) = c("value", "Nin", "htmira", "Pca")
 
 opt2 = cbind(mat1, opt2)
 
+# Plot the sensitivity analysis for the signal detection model
+
 png("Plots/FigureS3.png", width = 10, height =5, units = "in", res = 600)
 
-par(mfrow=c(1,2), mar = c(5,4,2,2)+0.1)
+par(mfrow=c(1,3), mar = c(5,4,2,2)+0.1)
 
 # Panel A
 plot(htmira~upd, data = subset(opt, htmira < 1000 & Ploss == 0.2), type ="l", 
@@ -594,6 +596,15 @@ points(htmira~success.rate, data = subset(opt2, Ploss == 0.25 & upd == 2.5 & man
 text(x = 0.15, y = 20, labels = "Baseline")
 legend("bottomright", legend = c("Basline scenario", expression(P[loss]==0.8), expression(u[pd]==20), "Attack cost + 1J"), bty = "n", lty = 1, col = c("black", "cyan", "green", "magenta"), lwd = 2)
 legend("topleft", legend = "B", bty = 'n')
+
+# Panel C
+plot(Htmira~mV, data = optmV, type = "l", log = "x", ylim = c(0,150), lwd = 2,
+     xlab = "Additional cost of attacking woodlouse (J)",
+     ylab = "")
+points(Htmira~mV, data = subset(optmV,N> 0.5), type = "p", lwd = 2)
+abline(v = 0.0055, lty = 2)
+text(x = 0.05, y = 5, labels = "Baseline")
+legend("topleft", legend = "C", bty = 'n')
 
 dev.off()
 
@@ -652,42 +663,8 @@ PWLsr75 = sapply(log(HT), FUN = alwaysattack, Woodlice = T, success.rate = 0.75)
 MWLsr50 = sapply(log(HT), FUN = alwaysattack, Woodlice = F, success.rate = 0.5)
 MWLsr75 = sapply(log(HT), FUN = alwaysattack, Woodlice = F, success.rate = 0.75)
 
-plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)")
-rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "grey", border = "grey")
-abline(v = 41.41, lty = 2)
-points(PWL~HT, type ="l", lwd = 3, col = "blue")
-points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
-legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
-       lty = c(1,2), col = c("blue", "orange"), bty = "n")
-
-
-plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)")
-rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "grey", border = "grey")
-abline(v = 41.41, lty = 2)
-points(PWLp3~HT, type ="l", col = "darkblue", lty = 1, lwd = 3)
-points(PWL~HT, type ="l", lwd = 3, col = "blue")
-points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
-legend("bottomright", legend = c("Woodlice", "No woodlice", "Woodlice\n (+ 1J attack cost)"), lwd = 3, 
-       lty = c(1,2), col = c("blue", "orange", "darkblue"), bty = "n")
-
-
-# Add together the signal detection results and the always attack results
-
-png("Plots/FigureS6.png", width = 8, height =8, units = "in", res = 600)
-par(mfcol=c(2,2), mar = c(5,4,2,2)+0.1)
-plot(Htmira~mV, data = optmV, type = "b", log = "x", ylim = c(0,100),
-     xlab = "Additional cost of attacking woodlouse (J)",
-     ylab = "Optimal spider height (cm)")
-abline(v = 0.0055, lty = 2)
-text(x = 0.05, y = 90, labels = "Baseline cost")
-legend("topleft", legend = "A", bty = "n")
-
-plot(N~mV, data = optmV, type = "b", log = "x",
-     xlab = "Additional cost of attacking woodlouse (J)",
-     ylab = "Optimal number of spider attacks")
-abline(v = 0.0055, lty = 2)
-text(x = 0.05, y = 4, labels = "Baseline cost")
-legend("topleft", legend = "B", bty = "n")
+png("Plots/FigureS6.png", width = 8, height =5, units = "in", res = 600)
+par(mfcol=c(1,2), mar = c(5,4,2,2)+0.1)
 
 plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)")
 rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "grey", border = "grey")
@@ -696,24 +673,25 @@ points(PWLp4~HT, type ="l", col = "black", lty = 1, lwd = 3)
 points(PWLp3~HT, type ="l", col = "blue", lty = 1, lwd = 3)
 points(PWL~HT, type ="l", lwd = 3, col = "lightblue")
 points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
-legend("topleft", legend = "C", bty = "n")
+legend("topleft", legend = "A", bty = "n")
+legend("bottomright", legend = c("No woodlice", "0 J", "1 J","10 J"), lwd = 3, title = "Extra attack cost",
+       lty = c(2,1,1,1), col = c("orange", "lightblue", "blue", "black"), bty = "n")
 
-plot(PWLsr75~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)",
+plot(PWLsr75~HT, type ="n", xlab = "Spider Height (cm)", ylab = "",
      ylim = c(0,15))
 rect(41.41 - 17.99, -1, 41.41 + 17.99, 20, col = "grey", border = "grey")
 abline(v = 41.41, lty = 2)
-points(PWL~HT, type ="l", lwd = 3, col = "lightblue")
+points(PWL~HT, type ="l", lwd = 2, col = "blue")
 points(PWLsr50~HT, type ="l", lwd = 3, col = "blue")
-points(PWLsr75~HT, type ="l", col = "darkblue", lwd = 3)
+points(PWLsr75~HT, type ="l", col = "blue", lwd = 4)
 
-points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 2)
 points(MWLsr50~HT, type ="l", col = "orange", lty = 3, lwd = 3)
-points(MWLsr75~HT, type ="l", col = "darkorange", lty = 3, lwd = 3)
-legend("topleft", legend = "C", bty = "n")
+points(MWLsr75~HT, type ="l", col = "orange", lty = 3, lwd = 4)
+legend("topleft", legend = "B", bty = "n")
+legend("bottomright", legend = c("0.25", "0.5", "0.75"), lwd = c(2,3,4), title = "Spider success rate",
+       lty = 1, col = c("black"), bty = "n")
 
-plot(PWL~HT, type ="n", bty = "n", xaxt = "n", yaxt = "n", ylab = "", xlab = "")
-legend("center", legend = c("No woodlice", "Woodlice", "Woodlice (+ 1J attack cost)","Woodlice (+ 10J attack cost)"), lwd = 3, 
-       lty = c(2,1,1,1), col = c("orange", "lightblue", "blue", "black"), bty = "n")
 dev.off()
 
 
@@ -861,6 +839,7 @@ png("Plots/Figure2.png", width = 10, height =5, units = "in", res = 600)
 
 par(mfrow=c(1,2))
 
+# Always attack model
 plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)",
      xlim = c(0,100))
 rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "lightgrey", border = "lightgrey")
@@ -871,7 +850,7 @@ legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3,
        lty = c(1,2), col = c("blue", "orange"), bty = "n")
 legend("topleft", legend = "A", bty = "n")
 
-
+# Individual-based model
 plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
      col = alpha("blue", 0.1),
      xlab = "Time steps (30 minutes)", ylab = "Spider Height")
