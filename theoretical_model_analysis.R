@@ -42,7 +42,7 @@ length(IP)/(length(IT)*6) # probability of being aboveground...convervative
 
 # this is much lower than expected for P. scaber (Hassall and Tuck 2007),
 # where a conservative estimate of 40 -90 (mean = 80) % of the population is sheltering at a given
-# time. O. asellus is less heat tolerant, so maybe that is OK.
+# time. O. asellus is less heat tolerant, so maybe that makes sense.
 
 # 1.1 Load in Jennie's Excell data ----
 
@@ -172,7 +172,7 @@ plot(fitCLARUS)
 summary(fitCLARUS)
 pairs(fitCLARUS)
 
-# ....1.2.2 ISOPOD ----
+# ....m ISOPOD ----
 
 ISOPOD2 = ISOPOD %>%
   filter(z < 1e6) %>%
@@ -726,7 +726,6 @@ for(i in 1:length(unique(touse$ID))){
   
 }
 
-
 rand.mv = 0.1 # fit to overall movement data
 dist_mean = mean(avg.cage[!is.na(avg.cage)]) #2.1 in Miller et al. 2014
 dist_sd = sd(avg.cage[!is.na(avg.cage)]) #3.2 in Miller et al. 2014
@@ -736,7 +735,7 @@ freq.move_mean = mean(freq.move[!is.na(freq.move)])
 freq.of.movement.cage = length(avg.cage[!is.na(avg.cage)])/length(avg.cage)
 
 
-simfunc <- function(steps = 100, reps = 100, Woodlice = T){
+simfunc <- function(steps = 100, reps = 100, Woodlice = T, Grasshoppermove = F){
   traj = matrix(NA, nrow = steps, ncol = reps)
   
   for(j in 1: reps){
@@ -746,7 +745,7 @@ simfunc <- function(steps = 100, reps = 100, Woodlice = T){
     for(i in 2:steps){
       OVERLAP = calc.overlap(traj[(i-1),j])
       
-      if(runif(1,0,1) <= OVERLAP[2]){
+      if(runif(1,0,1) <= OVERLAP[2] & !Grasshoppermove | runif(1,0,1) <= OVERLAP[2] & Grasshoppermove & runif(1,0,1) <=0.25){
         move = 0
       }else{
         if(runif(1,0,1) <= OVERLAP[3] & Woodlice |
@@ -766,9 +765,27 @@ simfunc <- function(steps = 100, reps = 100, Woodlice = T){
   return(traj)
 }
 
-trajW = simfunc()
-traj0 = simfunc(Woodlice = F)
+# Set ImoveafterGrasshopper = T if you want the spiders to move after an unsuccessful attack on a grasshopper
+ImoveafterGrasshopper = F
 
+if(ImoveafterGrasshopper){
+  trajW = simfunc(Grasshoppermove=T)
+  traj0 = simfunc(Woodlice = F, Grasshoppermove=T)
+}else{
+  trajW = simfunc(Grasshoppermove=F)
+  traj0 = simfunc(Woodlice = F, Grasshoppermove=F)
+}
+
+activehunter = T
+if(activehunter){
+  rand.mv = 0.8
+  trajW = simfunc(Grasshoppermove=T)
+  traj0 = simfunc(Woodlice = F, Grasshoppermove=T)
+} 
+
+
+
+png("Plots/FigureS8.png", width = 8, height =5, units = "in", res = 600)
 plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
      col = alpha("blue", 0.1),
      xlab = "Time steps (30 minutes)", ylab = "Spider Height")
@@ -794,8 +811,7 @@ points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
 points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
 points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
 points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
-
-
+dev.off()
 
 hist(trajW[1,])
 hist(trajW[dim(trajW)[2],])
@@ -827,11 +843,63 @@ colnames(check) = c("Avg_move", "Sd_move", "Prob_move_time_step", "Prob_move_cag
 check[,"Catagory"] = c("SimulationW", "Simulation0", "Expected")
 check
 
+if(activehunter){
+  write.csv(trajW,"SimRes/trajW_activehunter.csv", row.names = F)
+  write.csv(traj0,"SimRes/traj0_activehunter.csv", row.names = F)
+}else{
+  if(ImoveafterGrasshopper){
+    write.csv(trajW,"SimRes/trajW_grasshoppermove.csv", row.names = F)
+    write.csv(traj0,"SimRes/traj0_grasshoppermove.csv", row.names = F)
+  }else{
+    write.csv(trajW,"SimRes/trajW.csv", row.names = F)
+    write.csv(traj0,"SimRes/traj0.csv", row.names = F)
+  }
+}
+
+filemat = matrix(c("SimRes/trajW_grasshoppermove.csv",
+                   "SimRes/traj0_grasshoppermove.csv",
+                   "SimRes/trajW_activehunter.csv",
+                   "SimRes/traj0_activehunter.csv"), nrow = 2, ncol = 2)
+legmat = c("A", "B")
 
 
+png("Plots/FigureS8.png", width = 10, height =5, units = "in", res = 600)
+par(mfrow=c(1,2), mar = c(5,4,2,2) + 0.1)
+for(j in 1:2){
+  
+  trajW = read.csv(filemat[1,j])
+  traj0 = read.csv(filemat[2,j])
+  
+  plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
+       col = alpha("blue", 0.1),
+       xlab = "Time steps (30 minutes)", ylab = ifelse(j == 1, "Spider Height (cm)", ""))
+  rect(24, 0, 48, 2, col = "black", border = "black")
+  for(i in 2:dim(trajW)[1]){
+    points(trajW[,i],col = alpha("blue", 0.1), type ="l")
+  }
+  for(i in 1:dim(traj0)[1]){
+    points(traj0[,i],col = alpha("orange", 0.1), type ="l")
+  }
+  
+  polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+          c(apply(trajW,1, mean) - apply(trajW,1, sd),
+            rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
+          border = alpha("blue", 0.2), col = alpha("blue", 0.2))
+  
+  polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+          c(apply(traj0,1, mean) - apply(traj0,1, sd),
+            rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
+          border = alpha("orange", 0.2), col = alpha("orange", 0.2))
+  
+  points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
+  points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
+  points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
+  points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
+  legend("topleft", legend = legmat[j], bty = "n")
+}
 
-write.csv(trajW,"SimRes/trajW_12Dec2019.csv", row.names = F)
-write.csv(traj0,"SimRes/traj0_12Dec2019.csv", row.names = F)
+dev.off()
+
 
 # 5. Final plot with all results ----
 
@@ -849,6 +917,9 @@ points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
 legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
        lty = c(1,2), col = c("blue", "orange"), bty = "n")
 legend("topleft", legend = "A", bty = "n")
+
+trajW = read.csv("SimRes/trajW.csv")
+traj0 = read.csv("SimRes/traj0.csv")
 
 # Individual-based model
 plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),

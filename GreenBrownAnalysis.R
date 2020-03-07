@@ -499,8 +499,63 @@ dev.off()
 
 # Analyze the wolf spider data -----
 
-read_csv("Data/Behaviour2017.csv") %>%
-  filter(Cage %in% c("D", "E")) %>%
-  group_by(Animal, Cage) %>%
+rnd <- data.frame(Treatment = c("AIG", "AG", "IG"),
+                  xaxis = c("AIG", "AG", "aaaIG"))
+
+wolfspider = read_csv("Data/Behaviour2017.csv") %>%
+  filter(Cage %in% c("A", "D", "E")) %>%
+  group_by(Animal, Cage, Block) %>%
   summarize(sd = sd(z, na.rm = T), height = mean(z, na.rm = T)) %>%
-  filter(Animal != "ONAS")
+  filter(Animal != "ONAS" & Animal != "PIMI") %>%
+  left_join(
+    read_csv("Data/Harvest_SU17_23Sept2017.csv") %>% select(Cage, Block, LTreatment, Hopper) %>% unique()
+  ) %>% ungroup() %>% select(-Cage) %>% rename(Treatment = LTreatment) %>% filter(Animal != "GLGU") %>%
+  mutate(Block = as.character(Block)) %>% left_join(rnd)
+
+prior1 <- get_prior(height ~ xaxis +(1|Block),
+                    data=wolfspider)
+
+make_stancode(
+  height ~ xaxis +(1|Block),
+  data=wolfspider, prior=prior1
+)
+
+fit4 <- brm(
+  height ~ xaxis +(1|Block),
+  data=wolfspider, chains=1, iter = 10000,
+  prior=prior1
+)
+
+summary(fit4)
+plot(fit4)
+bayes_R2(fit4)
+
+plt_dat <- marginal_effects(fit4,resp ="height")$xaxis
+
+p1 = wolfspider %>% ggplot(aes(x=xaxis)) + 
+  geom_pointrange(data= plt_dat, size=2,aes(y= estimate__, ymin=lower__, ymax=upper__)) +
+  geom_jitter(aes(y=height,color=Block),
+              size=3, height=0, width=0.2) + theme_classic() +
+  ylab(expression(italic(M.~femurrubrum)~Height~(cm))) + 
+  xlab("Treatment") +
+  annotate("text", x = 2, y = 25, label = expression(R[Bayes]^2==0.49)) +
+  ylim(0,100) + 
+  scale_x_discrete(breaks=c("aaaIG","AG","AIG"),
+                   labels=c("Woodlice",
+                            "Spider",
+                            "Spider and\n woodlice"))
+
+p2 = wolfspider %>% ggplot(aes(x=xaxis)) +
+  geom_violin(aes(y=Hopper)) +
+  geom_jitter(aes(y=Hopper,color=Block),
+              size=3, height=0, width=0.3) + theme_classic() +
+  ylab(expression(italic(M.~femurrubrum)~Survival~('#'))) + 
+  xlab("Treatment") +
+  scale_x_discrete(breaks=c("aaaIG","AG","AIG"),
+                   labels=c("Woodlice",
+                            "Spider",
+                            "Spider and\n woodlice"))
+
+png("Plots/FigureS4.png", width=8, height=4, units="in", res=600)
+ggpubr::ggarrange(p1,p2, common.legend = T, labels = "AUTO")
+dev.off()
