@@ -59,7 +59,7 @@ har2013 <- harvest %>% filter(Year == 2013) %>%
   mutate(Treatment = ifelse(Treatment=="SG", "CSG", "CSIG"))
 
 
-# fit model 1 ---- 
+# fit model 1.0: no temperature priors ---- 
 
 # predicts the mean and SD of the height data by treatment
 # removing block random effect has no influence on result except reducing R2 a lot!
@@ -97,7 +97,7 @@ bayes_R2(fit1)
 
 marginal_effects(fit1, points=T)
 
-# fit model 1.1: Used in the MS! ----
+# fit model 1.1: used in the MS! ----
 
 # Including Brandon's prior
 # Spider
@@ -132,7 +132,7 @@ bayes_R2(fit1b)
 
 # no effect on qualitative outcome!
 
-# Fit model 1.2: removing behavioural cages from 2018 that lost data ----
+# fit model 1.2: removing behavioural cages from 2018 that lost data ----
 
 # Create new dataset without these cages
 lostafternoon = c("17", "21",  "22", "37", "38", "42")

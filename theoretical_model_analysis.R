@@ -765,54 +765,35 @@ simfunc <- function(steps = 100, reps = 100, Woodlice = T, Grasshoppermove = F){
   return(traj)
 }
 
-# Set ImoveafterGrasshopper = T if you want the spiders to move after an unsuccessful attack on a grasshopper
-ImoveafterGrasshopper = F
+# Sit-and-wait move after encountering grasshopper
+rand.mv = 0.1
+trajW = simfunc(Grasshoppermove=T)
+traj0 = simfunc(Woodlice = F, Grasshoppermove=T)
+write.csv(trajW,"SimRes/trajW_grasshoppermove.csv", row.names = F)
+write.csv(traj0,"SimRes/traj0_grasshoppermove.csv", row.names = F)
 
-if(ImoveafterGrasshopper){
-  trajW = simfunc(Grasshoppermove=T)
-  traj0 = simfunc(Woodlice = F, Grasshoppermove=T)
-}else{
-  trajW = simfunc(Grasshoppermove=F)
-  traj0 = simfunc(Woodlice = F, Grasshoppermove=F)
-}
+# Sit-and-wait do not move after encountering grasshopper
+rand.mv = 0.1
+trajW = simfunc(Grasshoppermove=F)
+traj0 = simfunc(Woodlice = F, Grasshoppermove=F)
+write.csv(trajW,"SimRes/trajW.csv", row.names = F)
+write.csv(traj0,"SimRes/traj0.csv", row.names = F)
 
-activehunter = T
-if(activehunter){
-  rand.mv = 0.8
-  trajW = simfunc(Grasshoppermove=T)
-  traj0 = simfunc(Woodlice = F, Grasshoppermove=T)
-} 
+# Active move after encountering grasshopper
+rand.mv = 0.8
+trajW = simfunc(Grasshoppermove=T)
+traj0 = simfunc(Woodlice = F, Grasshoppermove=T)
+write.csv(trajW,"SimRes/trajW_activehunter_grasshoppermove.csv", row.names = F)
+write.csv(traj0,"SimRes/traj0_activehunter_grasshoppermove.csv", row.names = F)
 
+# Active do not move after encountering grasshopper
+rand.mv = 0.8
+trajW = simfunc(Grasshoppermove=F)
+traj0 = simfunc(Woodlice = F, Grasshoppermove=F)
+write.csv(trajW,"SimRes/trajW_activehunter.csv", row.names = F)
+write.csv(traj0,"SimRes/traj0_activehunter.csv", row.names = F)
 
-
-png("Plots/FigureS8.png", width = 8, height =5, units = "in", res = 600)
-plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
-     col = alpha("blue", 0.1),
-     xlab = "Time steps (30 minutes)", ylab = "Spider Height")
-rect(24, 0, 48, 2, col = "black", border = "black")
-for(i in 2:dim(trajW)[1]){
-  points(trajW[,i],col = alpha("blue", 0.1), type ="l")
-}
-for(i in 1:dim(traj0)[1]){
-  points(traj0[,i],col = alpha("orange", 0.1), type ="l")
-}
-
-polygon(c(seq(1,100,1), rev(seq(1,100,1))),
-        c(apply(trajW,1, mean) - apply(trajW,1, sd),
-          rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
-        border = alpha("blue", 0.2), col = alpha("blue", 0.2))
-
-polygon(c(seq(1,100,1), rev(seq(1,100,1))),
-        c(apply(traj0,1, mean) - apply(traj0,1, sd),
-          rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
-        border = alpha("orange", 0.2), col = alpha("orange", 0.2))
-
-points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
-points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
-points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
-points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
-dev.off()
-
+# Calculate movement rates and distributions
 hist(trajW[1,])
 hist(trajW[dim(trajW)[2],])
 
@@ -843,88 +824,47 @@ colnames(check) = c("Avg_move", "Sd_move", "Prob_move_time_step", "Prob_move_cag
 check[,"Catagory"] = c("SimulationW", "Simulation0", "Expected")
 check
 
-if(activehunter){
-  write.csv(trajW,"SimRes/trajW_activehunter.csv", row.names = F)
-  write.csv(traj0,"SimRes/traj0_activehunter.csv", row.names = F)
-}else{
-  if(ImoveafterGrasshopper){
-    write.csv(trajW,"SimRes/trajW_grasshoppermove.csv", row.names = F)
-    write.csv(traj0,"SimRes/traj0_grasshoppermove.csv", row.names = F)
-  }else{
-    write.csv(trajW,"SimRes/trajW.csv", row.names = F)
-    write.csv(traj0,"SimRes/traj0.csv", row.names = F)
-  }
-}
-
-filemat = matrix(c("SimRes/trajW_grasshoppermove.csv",
-                   "SimRes/traj0_grasshoppermove.csv",
-                   "SimRes/trajW_activehunter.csv",
-                   "SimRes/traj0_activehunter.csv"), nrow = 2, ncol = 2)
-legmat = c("A", "B")
-
-
 png("Plots/FigureS8.png", width = 10, height =5, units = "in", res = 600)
-par(mfrow=c(1,2), mar = c(5,4,2,2) + 0.1)
-for(j in 1:2){
-  
-  trajW = read.csv(filemat[1,j])
-  traj0 = read.csv(filemat[2,j])
-  
-  plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
-       col = alpha("blue", 0.1),
-       xlab = "Time steps (30 minutes)", ylab = ifelse(j == 1, "Spider Height (cm)", ""))
-  rect(24, 0, 48, 2, col = "black", border = "black")
-  for(i in 2:dim(trajW)[1]){
-    points(trajW[,i],col = alpha("blue", 0.1), type ="l")
-  }
-  for(i in 1:dim(traj0)[1]){
-    points(traj0[,i],col = alpha("orange", 0.1), type ="l")
-  }
-  
-  polygon(c(seq(1,100,1), rev(seq(1,100,1))),
-          c(apply(trajW,1, mean) - apply(trajW,1, sd),
-            rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
-          border = alpha("blue", 0.2), col = alpha("blue", 0.2))
-  
-  polygon(c(seq(1,100,1), rev(seq(1,100,1))),
-          c(apply(traj0,1, mean) - apply(traj0,1, sd),
-            rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
-          border = alpha("orange", 0.2), col = alpha("orange", 0.2))
-  
-  points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
-  points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
-  points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
-  points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
-  legend("topleft", legend = legmat[j], bty = "n")
-}
-
-dev.off()
-
-
-# 5. Final plot with all results ----
-
-png("Plots/Figure2.png", width = 10, height =5, units = "in", res = 600)
-
 par(mfrow=c(1,2))
+# Individual-based model: Sit-and-wait
+trajW = read.csv("SimRes/trajW_grasshoppermove.csv")
+traj0 = read.csv("SimRes/traj0_grasshoppermove.csv")
 
-# Always attack model
-plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)",
-     xlim = c(0,100))
-rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "lightgrey", border = "lightgrey")
-abline(v = 41.41, lty = 2)
-points(PWL~HT, type ="l", lwd = 3, col = "blue")
-points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
-legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
-       lty = c(1,2), col = c("blue", "orange"), bty = "n")
-legend("topleft", legend = "A", bty = "n")
-
-trajW = read.csv("SimRes/trajW.csv")
-traj0 = read.csv("SimRes/traj0.csv")
-
-# Individual-based model
 plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
      col = alpha("blue", 0.1),
-     xlab = "Time steps (30 minutes)", ylab = "Spider Height")
+     xlab = "Time steps (30 minutes)", ylab = "Sit-and-wait spider height")
+rect(24, 0, 48, 2, col = "black", border = "black")
+
+for(i in 2:dim(trajW)[1]){
+  points(trajW[,i],col = alpha("blue", 0.1), type ="l")
+}
+for(i in 1:dim(traj0)[1]){
+  points(traj0[,i],col = alpha("orange", 0.1), type ="l")
+}
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(trajW,1, mean) - apply(trajW,1, sd),
+          rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
+        border = alpha("blue", 0.2), col = alpha("blue", 0.2))
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(traj0,1, mean) - apply(traj0,1, sd),
+          rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
+        border = alpha("orange", 0.2), col = alpha("orange", 0.2))
+
+points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
+points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
+legend("topleft", legend = "A", bty = "n")
+
+# Individual-based model: Active
+trajW = read.csv("SimRes/trajW_activehunter_grasshoppermove.csv")
+traj0 = read.csv("SimRes/traj0_activehunter_grasshoppermove.csv")
+
+plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
+     col = alpha("blue", 0.1),
+     xlab = "Time steps (30 minutes)", ylab = "Active spider height")
 rect(24, 0, 48, 2, col = "black", border = "black")
 
 for(i in 2:dim(trajW)[1]){
@@ -949,5 +889,88 @@ points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
 points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
 points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
 legend("topleft", legend = "B", bty = "n")
+dev.off()
+
+
+# 5. Final plot with all results ----
+
+png("Plots/Figure2.png", width = 12, height =6, units = "in", res = 600)
+
+par(mfrow=c(1,3))
+
+# Always attack model
+plot(PWL~HT, type ="n", xlab = "Spider Height (cm)", ylab = "Expected gain (J)",
+     xlim = c(0,100))
+rect(41.41 - 17.99, 0, 41.41 + 17.99, 7, col = "lightgrey", border = "lightgrey")
+abline(v = 41.41, lty = 2)
+points(PWL~HT, type ="l", lwd = 3, col = "blue")
+points(MWL~HT, type ="l", col = "orange", lty = 3, lwd = 3)
+legend("bottomright", legend = c("Woodlice", "No woodlice"), lwd = 3, 
+       lty = c(1,2), col = c("blue", "orange"), bty = "n")
+legend("topleft", legend = "A", bty = "n")
+
+# Individual-based model: Sit-and-wait
+trajW = read.csv("SimRes/trajW.csv")
+traj0 = read.csv("SimRes/traj0.csv")
+
+plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
+     col = alpha("blue", 0.1),
+     xlab = "Time steps (30 minutes)", ylab = "Sit-and-wait spider height")
+rect(24, 0, 48, 2, col = "black", border = "black")
+
+for(i in 2:dim(trajW)[1]){
+  points(trajW[,i],col = alpha("blue", 0.1), type ="l")
+}
+for(i in 1:dim(traj0)[1]){
+  points(traj0[,i],col = alpha("orange", 0.1), type ="l")
+}
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(trajW,1, mean) - apply(trajW,1, sd),
+          rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
+        border = alpha("blue", 0.2), col = alpha("blue", 0.2))
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(traj0,1, mean) - apply(traj0,1, sd),
+          rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
+        border = alpha("orange", 0.2), col = alpha("orange", 0.2))
+
+points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
+points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
+legend("topleft", legend = "B", bty = "n")
+
+# Individual-based model: Active
+trajW = read.csv("SimRes/trajW_activehunter.csv")
+traj0 = read.csv("SimRes/traj0_activehunter.csv")
+
+plot(trajW[,1], type ="l", ylim = c(0,100), xlim = c(0, dim(trajW)[2]),
+     col = alpha("blue", 0.1),
+     xlab = "Time steps (30 minutes)", ylab = "Active spider height")
+rect(24, 0, 48, 2, col = "black", border = "black")
+
+for(i in 2:dim(trajW)[1]){
+  points(trajW[,i],col = alpha("blue", 0.1), type ="l")
+}
+for(i in 1:dim(traj0)[1]){
+  points(traj0[,i],col = alpha("orange", 0.1), type ="l")
+}
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(trajW,1, mean) - apply(trajW,1, sd),
+          rev(apply(trajW,1, mean) + apply(trajW,1, sd))),
+        border = alpha("blue", 0.2), col = alpha("blue", 0.2))
+
+polygon(c(seq(1,100,1), rev(seq(1,100,1))),
+        c(apply(traj0,1, mean) - apply(traj0,1, sd),
+          rev(apply(traj0,1, mean) + apply(traj0,1, sd))),
+        border = alpha("orange", 0.2), col = alpha("orange", 0.2))
+
+points(apply(trajW,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(traj0,1, mean), type = "l", col = "white", lwd = 4)
+points(apply(trajW,1, mean), type = "l", col = "blue", lwd = 3)
+points(apply(traj0,1, mean), type = "l", col = "orange", lwd = 3)
+legend("topleft", legend = "C", bty = "n")
 
 dev.off()
