@@ -1,7 +1,7 @@
 require(brms)
 require(tidyverse)
 
-# Load in data ----
+# 0.0 Load in data ----
 source("behaviour_March2019.R")
 
 includetemp = T
@@ -10,7 +10,7 @@ shapevec = c("2013" = 3, "2015" = 19, "2017" = 17, "2018" = 15)
 
 head(behaviour)
 
-# clean up data for model ----
+# 0.1 clean up data for model ----
 
 behtomod1 <- behaviour %>% select(Time, Cage, Block, Year, Species, z, Treatment, Temp) %>% 
   filter(Treatment %in% c("SIG", "SG")) %>% 
@@ -59,7 +59,7 @@ har2013 <- harvest %>% filter(Year == 2013) %>%
   mutate(Treatment = ifelse(Treatment=="SG", "CSG", "CSIG"))
 
 
-# fit model 1.0: no temperature priors ---- 
+# 1.0 fit model: no temperature priors ---- 
 
 # predicts the mean and SD of the height data by treatment
 # removing block random effect has no influence on result except reducing R2 a lot!
@@ -97,7 +97,7 @@ bayes_R2(fit1)
 
 marginal_effects(fit1, points=T)
 
-# fit model 1.1: used in the MS! ----
+# 1.1 fit model: used in the MS! ----
 
 # Including Brandon's prior
 # Spider
@@ -132,7 +132,7 @@ bayes_R2(fit1b)
 
 # no effect on qualitative outcome!
 
-# fit model 1.2: removing behavioural cages from 2018 that lost data ----
+# 1.2 fit model: removing behavioural cages from 2018 that lost data ----
 
 # Create new dataset without these cages
 lostafternoon = c("17", "21",  "22", "37", "38", "42")
@@ -151,7 +151,7 @@ bayes_R2(fit1c)
 
 rm(temphartomod, lostafternoon)
 
-# fit model 2----
+# 2.0 fit model ----
 # predict the relationship between theoretical attack rate and grasshopper survival
 
 #basically attack prediction does not predict the surival well
@@ -232,7 +232,7 @@ marginal_effects(fit2)
 # Now estimate the brms model using the example online:
 # https://cran.r-project.org/web/packages/brms/vignettes/brms_nonlinear.html
 
-# fit model 2.1: without random effects ----
+# 2.1 fit model: without random effects ----
 prior2pt0 <- get_prior(
   Mf~attack,
   data=hartomod2,
@@ -269,7 +269,7 @@ model2 = glmer(Mf~attack + (1|Year), data=hartomod2, family=poisson())
 
 summary(model2)
 
-# fit model 2.2 with binomial distribution: Used in MS ----
+# 2.2 fit model: binomial distribution: used in MS ----
 
 # Modify the hartomod so it can be a binomial model
 hartomod3 = hartomod %>%
@@ -299,7 +299,7 @@ summary(fit3pt0)
 plot(fit3pt0)
 bayes_R2(fit3pt0)
 
-# Create SI Figure S2 -----
+# 3.0 Create SI Figure S2 -----
 
 suppfigdata <- hartomod %>% filter(Temp=="C") %>% group_by(Year, Treatment) %>%
   summarize(sdMf = sd(Mf, na.rm=T),
@@ -414,7 +414,7 @@ ggpubr::ggarrange(
 )
 dev.off()
 
-# Create Figure 1 graphic ----
+# 4.0 Create Figure 1 graphic ----
 
 hartomod_axis <- hartomod %>% mutate(XAXIS = paste0(Temp,Treatment))
 
@@ -497,7 +497,7 @@ cowplot::plot_grid(cowplot::get_legend(p4 + theme(legend.position = "top") +
 dev.off()
 
 
-# Analyze the wolf spider data -----
+# 5.0 Analyze the wolf spider data -----
 
 rnd <- data.frame(Treatment = c("AIG", "AG", "IG"),
                   xaxis = c("AIG", "AG", "aaaIG"))

@@ -550,7 +550,7 @@ opt2 = cbind(mat1, opt2)
 
 # Plot the sensitivity analysis for the signal detection model
 
-png("Plots/FigureS3.png", width = 10, height =5, units = "in", res = 600)
+png("Plots/FigureS7.png", width = 10, height =5, units = "in", res = 600)
 
 par(mfrow=c(1,3), mar = c(5,4,2,2)+0.1)
 
