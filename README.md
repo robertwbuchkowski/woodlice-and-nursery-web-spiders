@@ -37,4 +37,7 @@ The fifth section produces the plots for the MS.
 
 Compares the 1-D separation and the 3-D separation and produces Figure S1
 
+HOBO Temperature data: HOBOdataanalysis.R
+
+Produces the temperature plots from HOBO logger data in the 2018 cages
 
