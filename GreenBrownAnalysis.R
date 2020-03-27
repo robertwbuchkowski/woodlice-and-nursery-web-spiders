@@ -325,7 +325,7 @@ suppfigdata <- hartomod %>% filter(Temp=="C") %>% group_by(Year, Treatment) %>%
                             mean(c(73.3,72.9))),
              JulyTemp = c(74.9, 72.7, 69.9, 73.3),
              AugTemp = c(66.5, 72.1, 67.4, 72.9),
-             StockDate = c(204, 218,209, 212)
+             StockDate = c(204, 216,207, 220)
              )
 ) %>%
   mutate(JulyTemp = (JulyTemp-32)*5/9,
@@ -380,9 +380,9 @@ dev.off()
 
 #stocking dates: 
 # 2013 = July 23
-# 2015 =  Aug 6
+# 2015 =  Aug 4
 # 2017 = July 28
-# 2018 = July 31
+# 2018 = Aug 8
 
 hartomod %>% filter(Temp=="C")%>% 
   group_by(Year, Treatment) %>%

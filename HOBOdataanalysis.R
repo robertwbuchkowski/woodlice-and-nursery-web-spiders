@@ -34,8 +34,6 @@ for(i in 1:length(lf)){
   lf2[[i]] = da
 }
 
-View(lf2)
-
 lf2[[24]] = d1
 lf2[[25]] = d2
 
@@ -85,32 +83,68 @@ LF %>% as_tibble() %>% filter(ID %in% c("cage20.csv", "20.csv")) %>% ggplot(aes(
 
 LF44 = LF44 %>% as_tibble() %>% filter(!is.na(Temp))
 
+mac = data.frame(ID = c("10731719", "10731721","10731724","10731727",
+                        "10731723", "10731720", "10731729", "10731729_0", "10731730",
+                        "cage20","cage21","cage25","cage26","cage27",
+                        "cage29","cage35","cage38","cage44"),
+                 Cage = c("25","26","29","38","20","27", "43", "43","44",
+                          "20", "21", "25","26", "27", "29", "35", "38", "44"))
+
+LF44 = LF44 %>% separate(ID, into = c("ID", NA), sep = -4) %>%
+  left_join(mac) %>%
+  filter(!is.na(Cage)) %>% select(-ID)
+
 write_csv(LF44, "Data/HOBO.csv")
 
+
+
 # Starting analyiss with LF44
-LF44 = read_csv("Data/HOBO.csv")
+LF44 = read_csv("Data/HOBO.csv") %>% mutate(Cage = as.character(Cage))
 
+LF44 %>% ggplot(aes(x=Date, y = Temp, color = Cage)) + geom_line() + theme_bw()
 
-
-LF44 %>% ggplot(aes(x=Date, y = Temp, color = ID)) + geom_line() + theme_bw()
-
-LF44b = LF44[str_detect(LF44$ID, "cage"),]
-
-LF44b = LF44b %>% separate(ID, into=c(NA,"ID", NA), sep=c(4,-4)) %>%
-  rename(Cage = ID) %>%
-  mutate(Cage = as.numeric(Cage)) %>%
+# Add the treatment identifiers from other database
+LF44b = LF44  %>%
   left_join(
     read_csv("Data/Short Term Spider Data.csv") %>%
       select(Isopod, Temperature, Cage) %>%
-      distinct() 
+      distinct() %>%
+      mutate(Cage = as.character(Cage))
   ) %>% mutate(ID = ifelse(Temperature == "W", "Warmed", "Control"),
                ID2 = ifelse(Isopod == "N", "Woodlouse", "No woodlouse"))
 
-p1 = LF44b %>% ggplot(aes(x=Date, y = Temp, color = ID, linetype = ID2, group = Cage)) + geom_line() + theme_bw() + theme(legend.position = "top") + ylab("Temperature")
+LF44expt = LF44b %>% filter(Date > mdy_hms("08/09/18 07:00:00") &
+                              Date < mdy_hms("08/09/18 19:00:00"))
+
+etavg = LF44b %>% group_by(Cage, Temperature) %>%
+  summarize(Temp = mean(Temp)) %>% ungroup() %>% group_by(Temperature) %>%
+  summarize(sd = sd(Temp), avg = mean(Temp)) %>%
+  mutate(lower = avg - sd, upper= avg + sd) %>% select(-sd)
 
 
-p2 = LF44 %>% ggplot(aes(x=Date, y = Temp, color = ID)) + geom_line() + theme_bw() + ylab("Temperature") + theme(legend.position = "top")
+LF44b = LF44b %>% left_join(etavg)
+
+exptavg = LF44expt %>% group_by(Cage, Temperature) %>%
+  summarize(Temp = mean(Temp)) %>% ungroup() %>% group_by(Temperature) %>%
+  summarize(sd = sd(Temp), avg = mean(Temp))  %>%
+  mutate(lower = avg - sd, upper= avg + sd) %>% select(-sd)
+
+LF44expt = LF44expt %>% left_join(exptavg)
+
+p1 = LF44b %>% 
+  ggplot(aes(x=Date, color = ID)) +  
+  geom_line(aes(y = avg), size = 2) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.1) + 
+  geom_line(aes(y = Temp, group = Cage, linetype = ID2)) + theme_bw() + theme(legend.position = "top") + ylab("Temperature") + scale_linetype_discrete(name = "") +
+  scale_color_discrete(name = "")
+
+p2 = LF44expt %>% 
+  ggplot(aes(x=Date, color = ID)) +  
+  geom_line(aes(y = avg), size = 2) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.1) + 
+  geom_line(aes(y = Temp, group = Cage, linetype = ID2)) + theme_bw() + theme(legend.position = "top") + ylab("Temperature") + scale_linetype_discrete(name = "") +
+  scale_color_discrete(name = "") + xlab("Time")
 
 png("Plots/HOBO.png", width = 15, height = 8, units = "in", res = 600)
-ggpubr::ggarrange(p1,p2)
+ggpubr::ggarrange(p1,p2, common.legend = T, labels= "AUTO")
 dev.off()
