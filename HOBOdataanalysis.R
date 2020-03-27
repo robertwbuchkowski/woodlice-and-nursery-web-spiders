@@ -44,14 +44,14 @@ p1 = LF44b %>%
   geom_line(aes(y = avg), size = 2) + 
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.1) + 
   geom_line(aes(y = Temp, group = Cage, linetype = ID2)) + theme_bw() + theme(legend.position = "top") + ylab("Temperature") + scale_linetype_discrete(name = "") +
-  scale_color_discrete(name = "")
+  scale_color_manual(name = "", values = c("blue", "red"))
 
 p2 = LF44expt %>% 
   ggplot(aes(x=Date, color = ID)) +  
   geom_line(aes(y = avg), size = 2) + 
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.1) + 
   geom_line(aes(y = Temp, group = Cage, linetype = ID2)) + theme_bw() + theme(legend.position = "top") + ylab("Temperature") + scale_linetype_discrete(name = "") +
-  scale_color_discrete(name = "") + xlab("Time")
+  scale_color_manual(name = "", values = c("blue", "red")) + xlab("Time")
 
 png("Plots/HOBO.png", width = 15, height = 8, units = "in", res = 600)
 ggpubr::ggarrange(p1,p2, common.legend = T, labels= "AUTO")
